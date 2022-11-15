@@ -1,0 +1,22 @@
+{
+  "models": [
+    "facebook/data2vec-vision-base",
+    "Intel/dpt-large",
+    "microsoft/beit-base-patch16-224-pt22k",
+    "microsoft/beit-base-patch16-224", 
+    "microsoft/beit-base-patch16-384",
+    "microsoft/beit-large-patch16-224-pt22k",
+    "microsoft/beit-large-patch16-224",
+    "microsoft/beit-large-patch16-384", 
+    "microsoft/beit-large-patch16-512",
+    "nvidia/mit-b0", 
+    "nvidia/mit-b1", 
+    "nvidia/mit-b2",
+    "nvidia/mit-b3",
+    "nvidia/mit-b4",
+    "nvidia/mit-b5"
+  ]
+}
+
+
+
