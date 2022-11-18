@@ -51,7 +51,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["save_steps"] = 20
         self.cfg["eval_steps"] = 20
         self.cfg["eval_accumulation_steps"] = 5
-        self.cfg["test_percentage"] = 0.2
+        self.cfg["test_percent"] = 0.2
         self.cfg["output_folder"] = None
         self.cfg["ignore_idx_eval"] = 0
         self.cfg["output_folder"] = None
@@ -67,7 +67,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["save_steps"] = int(param_map["save_steps"])
         self.cfg["eval_steps"] = int(param_map["eval_steps"])
         self.cfg["eval_accumulation_steps"] = int(param_map["eval_accumulation_steps"])
-        self.cfg["test_percentage"] = float(param_map["test_percentage"])
+        self.cfg["test_percent"] = float(param_map["test_percent"])
         self.cfg["output_folder"] = str(param_map["output_folder"])
         self.cfg["ignore_idx_eval"] = int(param_map["ignore_idx_eval"])
         self.cfg["output_folder"] = param_map["output_folder"]
@@ -180,7 +180,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Merging images and masks
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
-        dataset = dataset.train_test_split(param.cfg["test_percentage"]) # Train/test split
+        dataset = dataset.train_test_split(param.cfg["test_percent"]) # Train/test split
 
         train_ds = dataset["train"]
         test_ds = dataset["test"]
