@@ -219,8 +219,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Setting up output directory
         if param.cfg["output_folder"] is None:
-            param.cfg["output_folder"] = os.path.dirname(os.path.realpath(__file__)) +\
-                                         "/outputs/" + param.cfg["model_name"]
+            param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
+                                         "outputs", param.cfg["model_name"])
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
 
         # Tensorboard directory
