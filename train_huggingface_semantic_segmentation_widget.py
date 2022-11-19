@@ -74,7 +74,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         # Train test split
         self.spin_train_test_split = pyqtutils.append_double_spin(self.grid_Layout,
                                                                 "Test image percentage",
-                                                                self.parameters.cfg["test_percent"],
+                                                                self.parameters.cfg["test_percentage"],
                                                                 min = 0.1, max = 1.0,
                                                                 step = 0.1, decimals = 1)
 
@@ -104,7 +104,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg["epochs"] = self.spin_epochs.value()
         self.parameters.cfg["batch_size"] = self.spin_batch.value()
         self.parameters.cfg["learning_rate"] = self.spin_lr.value()
-        self.parameters.cfg["test_percent"] = self.spin_train_test_split.value()
+        self.parameters.cfg["test_percentage"] = self.spin_train_test_split.value()
         self.parameters.cfg["imgsz"] = self.spin_train_imgsz.value()
         self.parameters.cfg["ignore_idx_eval"] = self.ignore_idx_eval.value()
         self.parameters.cfg["output_folder"] = self.browse_folder.path

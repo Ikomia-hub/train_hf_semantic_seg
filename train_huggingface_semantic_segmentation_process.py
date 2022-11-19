@@ -33,6 +33,7 @@ import numpy as np
 import os
 from datetime import datetime
 from pathlib import Path
+import yaml
 
 
 # --------------------
@@ -48,10 +49,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["batch_size"] = 4
         self.cfg["imgsz"] = 512
         self.cfg["learning_rate"] = 0.00006
-        self.cfg["save_steps"] = 20
-        self.cfg["eval_steps"] = 20
-        self.cfg["eval_accumulation_steps"] = 5
-        self.cfg["test_percent"] = 0.2
+        self.cfg["test_percentage"] = 0.2
         self.cfg["output_folder"] = None
         self.cfg["ignore_idx_eval"] = 0
         self.cfg["output_folder"] = None
@@ -64,10 +62,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["batch_size"] = int(param_map["batch_size"])
         self.cfg["imgsz"] = int(param_map["imgsz"])
         self.cfg["learning_rate"] = int(param_map["learning_rate"])
-        self.cfg["save_steps"] = int(param_map["save_steps"])
-        self.cfg["eval_steps"] = int(param_map["eval_steps"])
-        self.cfg["eval_accumulation_steps"] = int(param_map["eval_accumulation_steps"])
-        self.cfg["test_percent"] = float(param_map["test_percent"])
+        self.cfg["test_percentage"] = float(param_map["test_percentage"])
         self.cfg["output_folder"] = str(param_map["output_folder"])
         self.cfg["ignore_idx_eval"] = int(param_map["ignore_idx_eval"])
         self.cfg["output_folder"] = param_map["output_folder"]
@@ -180,7 +175,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Merging images and masks
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
-        dataset = dataset.train_test_split(param.cfg["test_percent"]) # Train/test split
+        dataset = dataset.train_test_split(param.cfg["test_percentage"]) # Train/test split
 
         train_ds = dataset["train"]
         test_ds = dataset["test"]
@@ -227,6 +222,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         str_datetime = datetime.now().strftime("%d-%m-%YT%Hh%Mm%Ss")
         tb_dir = str((Path(core.config.main_cfg["tensorboard"]["log_uri"]) / str_datetime))
 
+        # Loading config
+        config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                    "config", "config.yaml")
+        with open(config_path) as f:
+            config = yaml.load(f, Loader=yaml.FullLoader)
+
         # Hyperparameters and costumization settings during training
         training_args = TrainingArguments(
             param.cfg["output_folder"],
@@ -234,17 +235,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             num_train_epochs=param.cfg["epochs"],
             per_device_train_batch_size=param.cfg["batch_size"],
             per_device_eval_batch_size=param.cfg["batch_size"],
-            save_total_limit=3,
-            evaluation_strategy="steps",
-            save_strategy="steps",
-            save_steps=param.cfg["save_steps"],
-            eval_steps=param.cfg["eval_steps"],
-            logging_steps=1,
-            eval_accumulation_steps=param.cfg["eval_accumulation_steps"],
-            load_best_model_at_end=True,
-            remove_unused_columns=False,
             logging_dir=tb_dir,
-            report_to="mlflow"
+            **config,
         )
 
         self.metric = evaluate.load("mean_iou")
