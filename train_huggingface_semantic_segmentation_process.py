@@ -34,7 +34,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 import yaml
-
+import json
 
 # --------------------
 # - Class to handle the process parameters
@@ -95,6 +95,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.feature_extractor = None
         self.jitter = None
         self.num_labels = None
+        self.id2label = None
+        self.label2id = None
         self.trainer = None
         self.ignore_idx_eval = None
         self.metric = None
@@ -117,8 +119,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         return inputs
 
     def val_transforms(self, example_batch):
-        #param = self.getParam()
-        images = [x for x in example_batch['pixel_values']]
+        images = [x.convert("RGB") for x in example_batch['pixel_values']]
         labels = [x for x in example_batch['label']]
         inputs = self.feature_extractor(images, labels)
         return inputs
@@ -137,7 +138,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             ).argmax(dim = 1)
 
             pred_labels = logits_tensor.detach().cpu().numpy()
-            metrics = self.metric.compute(
+            metrics = self.metric._compute(
                                         predictions=pred_labels,
                                         references=labels,
                                         num_labels=self.num_labels,
@@ -145,14 +146,22 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                         reduce_labels=self.feature_extractor.reduce_labels
                                         )
 
-            for key, value in metrics.items():
-                if type(value) is np.ndarray:
-                    metrics[key] = value.tolist()
-            return metrics
+        # add per category metrics as individual key-value pairs
+        per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
+        per_category_iou = metrics.pop("per_category_iou").tolist()
+
+        metrics.update({f"accuracy_{self.id2label[i]}": v for i, v in enumerate(per_category_accuracy)})
+        metrics.update({f"iou_{self.id2label[i]}": v for i, v in enumerate(per_category_iou)})
+    
+        return metrics
 
     def run(self):
         # Core function of your process
         # Call beginTaskRun for initialization
+        # Mlflow setting
+        os.environ["MLFLOW_FLATTEN_PARAMS"] = "TRUE"
+
+        # Get input
         input = self.getInput(0)
 
         param = self.getParam()
@@ -164,6 +173,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         for image in input.data["images"]:
             filename_list.append(image["filename"])
         dict_img = {'pixel_values': filename_list}
+
         dataset_img = Dataset.from_dict(dict_img).cast_column("pixel_values", Image()) # Images dataset
 
         semantic_seg_masks_file = []
@@ -171,7 +181,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             semantic_seg_masks_file.append(image["semantic_seg_masks_file"])
         dict_mask = {'label': semantic_seg_masks_file}
         dataset_mask = Dataset.from_dict(dict_mask).cast_column("label", Image()) # Mask dataset
-
+    
         # Merging images and masks
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
@@ -180,16 +190,11 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
-        # Selection of the feature extractor
-        model_feature_extractor = param.cfg["model_name"]
-
-        # Selection of the pre-trained model
-        pretrained_model_name  = param.cfg["model_name"]
-
         # Image transformation (tensor, data augmentation) on-the-fly batches
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
-                                                                    model_feature_extractor,
-                                                                    size = param.cfg["imgsz"]
+                                                                    param.cfg["model_name"],
+                                                                    size = param.cfg["imgsz"],
+                                                                    return_tensors = "pt"
                                                                     )
         self.jitter = ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.1)
 
@@ -198,18 +203,20 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Labels preparation
         self.num_labels = len(input.data["metadata"]['category_names'])
-        id2label = input.data["metadata"]['category_names']
-        label2id = {v: k for k, v in id2label.items()}
+        self.id2label = input.data["metadata"]['category_names']
+        print(self.id2label)
+        self.label2id = {v: k for k, v in self.id2label.items()}
+        print(self.label2id)
 
         # Index to be ignored during evaluation
         self.ignore_idx_eval = param.cfg["ignore_idx_eval"]
 
         # Loading Model
         model = AutoModelForSemanticSegmentation.from_pretrained(
-            pretrained_model_name,
+            param.cfg["model_name"],
             num_labels = self.num_labels,
-            id2label = id2label,
-            label2id = label2id,
+            id2label = self.id2label,
+            label2id = self.label2id,
             ignore_mismatched_sizes=True)
 
         # Setting up output directory
