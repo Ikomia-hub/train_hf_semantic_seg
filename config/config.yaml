@@ -18,7 +18,7 @@ hub_model_id: hub_model_id
 hub_strategy: "end"
 load_best_model_at_end: True
 remove_unused_columns: False
-report_to: "mlflow"
+report_to: ["mlflow"]
 optim: "adamw_hf"
 adam_beta1: 0.9
 adam_beta2: 0.999
