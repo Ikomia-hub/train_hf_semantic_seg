@@ -75,14 +75,14 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.spin_train_test_split = pyqtutils.append_double_spin(self.grid_Layout,
                                                                 "Test image percentage",
                                                                 self.parameters.cfg["test_percentage"],
-                                                                min = 0.1, max = 1.0,
-                                                                step = 0.1, decimals = 1)
+                                                                min = 0.01, max = 1.0,
+                                                                step = 0.05, decimals = 2)
 
         # Ingore index
         self.ignore_idx_eval = pyqtutils.append_double_spin(self.grid_Layout, 
                                                             "Index number ignored during eval",
                                                             self.parameters.cfg["ignore_idx_eval"],
-                                                            min = 0, max = 250, step = 1, decimals = 0)
+                                                            min = 0, max = 255, step = 1, decimals = 0)
 
         # Output folder
         self.browse_folder = pyqtutils.append_browse_file(self.grid_Layout, label="Output folder",
