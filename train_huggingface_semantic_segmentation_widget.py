@@ -84,6 +84,11 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
                                                             self.parameters.cfg["ignore_idx_eval"],
                                                             min = 0, max = 255, step = 1, decimals = 0)
 
+        # Expert mode configuration
+        self.browse_config = pyqtutils.append_browse_file(self.grid_Layout, label="Advanced YAML config",
+                                                        path=self.parameters.cfg["expertModeCfg"],
+                                                        tooltip="Select output folder")
+
         # Output folder
         self.browse_folder = pyqtutils.append_browse_file(self.grid_Layout, label="Output folder",
                                                         path=self.parameters.cfg["output_folder"],
@@ -107,6 +112,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg["test_percentage"] = self.spin_train_test_split.value()
         self.parameters.cfg["imgsz"] = self.spin_train_imgsz.value()
         self.parameters.cfg["ignore_idx_eval"] = self.ignore_idx_eval.value()
+        self.parameters.cfg["expertModeCfg"] = self.browse_config.path
         self.parameters.cfg["output_folder"] = self.browse_folder.path
         self.emitApply(self.parameters)
 

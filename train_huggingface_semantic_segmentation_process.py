@@ -35,6 +35,7 @@ from datetime import datetime
 from pathlib import Path
 import yaml
 import json
+import copy
 
 # --------------------
 # - Class to handle the process parameters
@@ -52,6 +53,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["test_percentage"] = 0.2
         self.cfg["output_folder"] = None
         self.cfg["ignore_idx_eval"] = 0
+        self.cfg["expertModeCfg"] = None
         self.cfg["output_folder"] = None
 
     def setParamMap(self, param_map):
@@ -65,6 +67,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["test_percentage"] = float(param_map["test_percentage"])
         self.cfg["output_folder"] = str(param_map["output_folder"])
         self.cfg["ignore_idx_eval"] = int(param_map["ignore_idx_eval"])
+        self.cfg["expertModeCfg"] = param_map["expertModeCfg"]
         self.cfg["output_folder"] = param_map["output_folder"]
 
 # --------------------
@@ -173,7 +176,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         for image in input.data["images"]:
             filename_list.append(image["filename"])
         dict_img = {'pixel_values': filename_list}
-
         dataset_img = Dataset.from_dict(dict_img).cast_column("pixel_values", Image()) # Images dataset
 
         semantic_seg_masks_file = []
@@ -181,7 +183,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             semantic_seg_masks_file.append(image["semantic_seg_masks_file"])
         dict_mask = {'label': semantic_seg_masks_file}
         dataset_mask = Dataset.from_dict(dict_mask).cast_column("label", Image()) # Mask dataset
-    
+
         # Merging images and masks
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
@@ -204,9 +206,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Labels preparation
         self.num_labels = len(input.data["metadata"]['category_names'])
         self.id2label = input.data["metadata"]['category_names']
-        print(self.id2label)
         self.label2id = {v: k for k, v in self.id2label.items()}
-        print(self.label2id)
 
         # Index to be ignored during evaluation
         self.ignore_idx_eval = param.cfg["ignore_idx_eval"]
@@ -219,32 +219,43 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             label2id = self.label2id,
             ignore_mismatched_sizes=True)
 
-        # Setting up output directory
-        if param.cfg["output_folder"] is None:
-            param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
-                                         "outputs", param.cfg["model_name"])
-        os.makedirs(param.cfg["output_folder"], exist_ok=True)
-
         # Tensorboard directory
         str_datetime = datetime.now().strftime("%d-%m-%YT%Hh%Mm%Ss")
         tb_dir = str((Path(core.config.main_cfg["tensorboard"]["log_uri"]) / str_datetime))
 
-        # Loading config
-        config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                    "config", "config.yaml")
-        with open(config_path) as f:
-            config = yaml.load(f, Loader=yaml.FullLoader)
+        # Setting up output directory
+        if param.cfg["output_folder"] is None:
+            param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
+                                         "outputs", param.cfg["model_name"], str_datetime)
+        os.makedirs(param.cfg["output_folder"], exist_ok=True)
 
-        # Hyperparameters and costumization settings during training
-        training_args = TrainingArguments(
-            param.cfg["output_folder"],
-            learning_rate=param.cfg["learning_rate"],
-            num_train_epochs=param.cfg["epochs"],
-            per_device_train_batch_size=param.cfg["batch_size"],
-            per_device_eval_batch_size=param.cfg["batch_size"],
-            logging_dir=tb_dir,
-            **config,
-        )
+        #Hyperparameters and costumization settings during training
+        if param.cfg["expertModeCfg"] is None:
+            training_args = TrainingArguments(
+                param.cfg["output_folder"],
+                learning_rate=param.cfg["learning_rate"],
+                num_train_epochs=param.cfg["epochs"],
+                per_device_train_batch_size=param.cfg["batch_size"],
+                per_device_eval_batch_size=param.cfg["batch_size"],
+                evaluation_strategy="steps",
+                save_strategy="steps",
+                save_steps=20,
+                eval_steps=20,
+                logging_steps=1,
+                eval_accumulation_steps=5,
+                load_best_model_at_end=True,
+                logging_dir=tb_dir,
+                remove_unused_columns=False,
+                report_to = "mlflow",
+            )
+        else:
+            with open(param.cfg["expertModeCfg"]) as f:
+                args = yaml.full_load(f)
+            training_args = TrainingArguments(
+                param.cfg["output_folder"],
+                learning_rate=param.cfg["learning_rate"],
+                **args,
+            )
 
         self.metric = evaluate.load("mean_iou")
 
@@ -258,8 +269,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         )
 
         self.trainer.train()
-
-        self.trainer.save_model(output_dir=param.cfg["output_folder"])
 
         # Step progress bar:
         self.emitStepProgress()
