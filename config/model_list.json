@@ -1,6 +1,5 @@
 {
   "facebook/data2vec-vision-base": "Data2VecVision",
-  "Intel/dpt-large":"DPT",
   "microsoft/beit-base-patch16-224-pt22k":"BEiT",
   "microsoft/beit-base-patch16-224":"BEiT", 
   "microsoft/beit-base-patch16-384":"BEiT",
