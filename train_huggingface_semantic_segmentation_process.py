@@ -105,6 +105,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.metric = None
         self.model_id = None
         self.enableTensorboard(True)
+        self.imgsz_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                                "config", "model_img_size.json")
 
     def getProgressSteps(self):
         # Function returning the number of progress steps for this process
@@ -193,11 +195,22 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
-        # Image transformation (tensor, data augmentation) on-the-fly batches
+        # Model name
         self.model_id = param.cfg["model_name"].split(": ",1)[1]
+
+        # Checking if the selected image size fits the model
+        with open(self.imgsz_file, "r") as f:
+            model_size_list = json.load(f)
+        if self.model_id in model_size_list.keys():
+            img_size = model_size_list[self.model_id]
+            print(f'Image size parameter changed to ({img_size}x{img_size}) to match {self.model_id} model')
+        else:
+            img_size = param.cfg["imgsz"]
+        
+        # Image transformation (tensor, data augmentation) on-the-fly batches
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
                                                                     self.model_id,
-                                                                    size = param.cfg["imgsz"],
+                                                                    size = img_size,
                                                                     return_tensors = "pt"
                                                                     )
         self.jitter = ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.1)
@@ -231,6 +244,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                          "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
 
+
         #Hyperparameters and costumization settings during training
         if param.cfg["expertModeCfg"] is None:
             training_args = TrainingArguments(
@@ -249,6 +263,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
                 report_to = "mlflow",
+                dataloader_drop_last=True,
             )
         else:
             with open(param.cfg["expertModeCfg"]) as f:
@@ -260,7 +275,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             )
 
         self.metric = evaluate.load("mean_iou")
-
+        model.eval()
         # Instantiation of the Trainer API for training with Pytorch
         self.trainer = Trainer(
             model=model,
@@ -269,7 +284,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             eval_dataset=test_ds,
             compute_metrics=self.compute_metrics,
         )
-
+        
         self.trainer.train()
 
         # Step progress bar:

@@ -1,0 +1,14 @@
+
+{
+  "facebook/data2vec-vision-base": 224,
+  "microsoft/beit-base-patch16-224-pt22k":224,
+  "microsoft/beit-base-patch16-224":224, 
+  "microsoft/beit-base-patch16-384":384,
+  "microsoft/beit-large-patch16-224-pt22k":224,
+  "microsoft/beit-large-patch16-224":224,
+  "microsoft/beit-large-patch16-384":384, 
+  "microsoft/beit-large-patch16-512":512
+}
+
+
+
