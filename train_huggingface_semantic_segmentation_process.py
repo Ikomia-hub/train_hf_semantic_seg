@@ -45,7 +45,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
-        self.cfg["model_name"] = "nvidia/mit-b0"
+        self.cfg["model_name"] = "Segformer: nvidia/mit-b0"
         self.cfg["epochs"] = 50
         self.cfg["batch_size"] = 4
         self.cfg["imgsz"] = 512
@@ -103,6 +103,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.trainer = None
         self.ignore_idx_eval = None
         self.metric = None
+        self.model_id = None
         self.enableTensorboard(True)
 
     def getProgressSteps(self):
@@ -193,8 +194,9 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         test_ds = dataset["test"]
 
         # Image transformation (tensor, data augmentation) on-the-fly batches
+        self.model_id = param.cfg["model_name"].split(": ",1)[1]
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
-                                                                    param.cfg["model_name"],
+                                                                    self.model_id,
                                                                     size = param.cfg["imgsz"],
                                                                     return_tensors = "pt"
                                                                     )
@@ -213,7 +215,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Loading Model
         model = AutoModelForSemanticSegmentation.from_pretrained(
-            param.cfg["model_name"],
+            self.model_id,
             num_labels = self.num_labels,
             id2label = self.id2label,
             label2id = self.label2id,
@@ -226,7 +228,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Setting up output directory
         if param.cfg["output_folder"] is None:
             param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
-                                         "outputs", param.cfg["model_name"], str_datetime)
+                                         "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
 
         #Hyperparameters and costumization settings during training

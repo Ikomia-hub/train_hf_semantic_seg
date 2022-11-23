@@ -49,8 +49,8 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         with open(model_list_path, "r") as f:
             model_name_list = json.load(f)
 
-        for model_name in model_name_list["models"]:
-            self.combo_model.addItem(model_name)
+        for k, v in model_name_list.items():
+            self.combo_model.addItem(f'{v}: {k}')
 
         self.combo_model.setCurrentText(self.parameters.cfg["model_name"])
 
