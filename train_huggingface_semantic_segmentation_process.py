@@ -149,7 +149,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                         references=labels,
                                         num_labels=self.num_labels,
                                         ignore_index=self.ignore_idx_eval,
-                                        reduce_labels=self.feature_extractor.reduce_labels
+                                        reduce_labels=False
                                         )
 
         # add per category metrics as individual key-value pairs
@@ -158,7 +158,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         metrics.update({f"accuracy_{self.id2label[i]}": v for i, v in enumerate(per_category_accuracy)})
         metrics.update({f"iou_{self.id2label[i]}": v for i, v in enumerate(per_category_iou)})
-    
+
         return metrics
 
     def run(self):
@@ -166,6 +166,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Call beginTaskRun for initialization
         # Mlflow setting
         os.environ["MLFLOW_FLATTEN_PARAMS"] = "TRUE"
+        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
         # Get input
         input = self.getInput(0)
@@ -206,7 +207,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             print(f'Image size parameter changed to ({img_size}x{img_size}) to match {self.model_id} model')
         else:
             img_size = param.cfg["imgsz"]
-        
+
         # Image transformation (tensor, data augmentation) on-the-fly batches
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
                                                                     self.model_id,
@@ -244,15 +245,22 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                          "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
 
+        # Checking batch size
+        if "nvidia" not in self.model_id:
+            if param.cfg["batch_size"] == 1:
+                batch_size = 2
+            print(f'Batch of 1 not compatible with {self.model_id} batch size changed to {batch_size}')
+        else:
+           batch_size = param.cfg["batch_size"]
 
-        #Hyperparameters and costumization settings during training
+        # Hyperparameters and costumization settings during training
         if param.cfg["expertModeCfg"] is None:
             training_args = TrainingArguments(
                 param.cfg["output_folder"],
                 learning_rate=param.cfg["learning_rate"],
                 num_train_epochs=param.cfg["epochs"],
-                per_device_train_batch_size=param.cfg["batch_size"],
-                per_device_eval_batch_size=param.cfg["batch_size"],
+                per_device_train_batch_size=batch_size,
+                per_device_eval_batch_size=batch_size,
                 evaluation_strategy="steps",
                 save_strategy="steps",
                 save_steps=20,
@@ -263,7 +271,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
                 report_to = "mlflow",
-                dataloader_drop_last=True,
             )
         else:
             with open(param.cfg["expertModeCfg"]) as f:
@@ -275,7 +282,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             )
 
         self.metric = evaluate.load("mean_iou")
-        model.eval()
+        
         # Instantiation of the Trainer API for training with Pytorch
         self.trainer = Trainer(
             model=model,
@@ -284,7 +291,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             eval_dataset=test_ds,
             compute_metrics=self.compute_metrics,
         )
-        
         self.trainer.train()
 
         # Step progress bar:
