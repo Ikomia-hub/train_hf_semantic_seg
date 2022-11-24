@@ -1,8 +1,10 @@
 {
   "facebook/data2vec-vision-base": "Data2VecVision",
+  "microsoft/beit-base-patch16-224-pt22k-ft22k":"BEiT",
   "microsoft/beit-base-patch16-224-pt22k":"BEiT",
   "microsoft/beit-base-patch16-224":"BEiT", 
   "microsoft/beit-base-patch16-384":"BEiT",
+  "microsoft/beit-large-patch16-224-pt22k-ft22k":"BEiT",
   "microsoft/beit-large-patch16-224-pt22k":"BEiT",
   "microsoft/beit-large-patch16-224":"BEiT",
   "microsoft/beit-large-patch16-384":"BEiT", 
