@@ -21,6 +21,7 @@ from ikomia.core.task import TaskParam
 from ikomia.dnn import datasetio, dnntrain
 import copy
 # Your imports below
+from detectron2.layers import FrozenBatchNorm2d
 import datasets
 from datasets import Image, Dataset
 from torchvision.transforms import ColorJitter
@@ -77,7 +78,6 @@ class StopTraining(TrainerCallback):
 
     def on_step_end(self, args, state, control, logs=None, **kwargs):
         control.should_training_stop = True
-
 
 # --------------------
 # - Class which implements the process
@@ -160,6 +160,15 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         metrics.update({f"iou_{self.id2label[i]}": v for i, v in enumerate(per_category_iou)})
 
         return metrics
+    
+    def freeze_batchnorm2d(self, module: torch.nn.Module):
+        for name, child in module.named_children():
+            if isinstance(child, torch.nn.BatchNorm2d):
+                child: torch.nn.BatchNorm2d = child
+                setattr(module, name, FrozenBatchNorm2d(child.num_features))
+            else:
+                self.freeze_batchnorm2d(child)
+
 
     def run(self):
         # Core function of your process
@@ -246,12 +255,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
 
         # Checking batch size
-        if "nvidia" not in self.model_id:
-            if param.cfg["batch_size"] == 1:
-                batch_size = 2
-            print(f'Batch of 1 not compatible with {self.model_id} batch size changed to {batch_size}')
-        else:
-           batch_size = param.cfg["batch_size"]
+        if "nvidia" not in self.model_id and param.cfg["batch_size"] == 1:
+            self.freeze_batchnorm2d(model)
 
         # Hyperparameters and costumization settings during training
         if param.cfg["expertModeCfg"] is None:
@@ -259,8 +264,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 param.cfg["output_folder"],
                 learning_rate=param.cfg["learning_rate"],
                 num_train_epochs=param.cfg["epochs"],
-                per_device_train_batch_size=batch_size,
-                per_device_eval_batch_size=batch_size,
+                per_device_train_batch_size=param.cfg["batch_size"],
+                per_device_eval_batch_size=param.cfg["batch_size"],
                 evaluation_strategy="steps",
                 save_strategy="steps",
                 save_steps=20,
@@ -270,6 +275,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 load_best_model_at_end=True,
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
+                dataloader_drop_last=True,
                 report_to = "mlflow",
             )
         else:
@@ -282,7 +288,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             )
 
         self.metric = evaluate.load("mean_iou")
-        
+
         # Instantiation of the Trainer API for training with Pytorch
         self.trainer = Trainer(
             model=model,
