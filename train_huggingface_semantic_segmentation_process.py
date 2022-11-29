@@ -46,14 +46,14 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
-        self.cfg["model_name"] = "Segformer: nvidia/mit-b0"
+        self.cfg["model_name"] = "Data2VecVision: facebook/data2vec-vision-base"
         self.cfg["epochs"] = 50
         self.cfg["batch_size"] = 4
-        self.cfg["imgsz"] = 512
+        self.cfg["imgsz"] = 224
         self.cfg["learning_rate"] = 0.00006
         self.cfg["test_percentage"] = 0.2
         self.cfg["output_folder"] = None
-        self.cfg["ignore_idx_eval"] = 0
+        self.cfg["ignore_idx_eval"] = 255
         self.cfg["expertModeCfg"] = None
         self.cfg["output_folder"] = None
 
@@ -96,12 +96,11 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             self.setParam(copy.deepcopy(param))
 
         self.feature_extractor = None
-        self.jitter = None
         self.num_labels = None
         self.id2label = None
         self.label2id = None
         self.trainer = None
-        self.ignore_idx_eval = None
+        self.ignore_idx_eval = 255
         self.metric = None
         self.model_id = None
         self.enableTensorboard(True)
@@ -119,7 +118,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
     def train_transforms(self, example_batch):
         #param = self.getParam()
-        images = [self.jitter(x) for x in example_batch['pixel_values']] # Data augmentation
+        images = [x.convert("RGB") for x in example_batch['pixel_values']]
         labels = [x for x in example_batch['label']]
         inputs = self.feature_extractor(images, labels)
         return inputs
@@ -158,9 +157,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         metrics.update({f"accuracy_{self.id2label[i]}": v for i, v in enumerate(per_category_accuracy)})
         metrics.update({f"iou_{self.id2label[i]}": v for i, v in enumerate(per_category_iou)})
-
         return metrics
-    
+
     def freeze_batchnorm2d(self, module: torch.nn.Module):
         for name, child in module.named_children():
             if isinstance(child, torch.nn.BatchNorm2d):
@@ -175,7 +173,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Call beginTaskRun for initialization
         # Mlflow setting
         os.environ["MLFLOW_FLATTEN_PARAMS"] = "TRUE"
-        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
         # Get input
         input = self.getInput(0)
@@ -220,10 +217,11 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Image transformation (tensor, data augmentation) on-the-fly batches
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
                                                                     self.model_id,
-                                                                    size = img_size,
-                                                                    return_tensors = "pt"
+                                                                    size=img_size,
+                                                                    return_tensors="pt",
+                                                                    reduce_labels=False,
+                                                                    resample=0,
                                                                     )
-        self.jitter = ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25, hue=0.1)
 
         train_ds.set_transform(self.train_transforms)
         test_ds.set_transform(self.val_transforms)
@@ -275,7 +273,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 load_best_model_at_end=True,
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
-                dataloader_drop_last=True,
+                #dataloader_drop_last=True,
                 report_to = "mlflow",
             )
         else:
