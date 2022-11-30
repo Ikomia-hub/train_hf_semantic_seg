@@ -6,7 +6,8 @@
 # - https://huggingface.co/docs/transformers/main_classes/trainer#transformers.TrainingArguments
 # --------------------
 
-# learning_rate: To be set in widget
+
+learning_rate: 0.0005
 num_train_epochs: 20
 per_device_train_batch_size: 2
 per_device_eval_batch_size: 2
@@ -30,4 +31,4 @@ adam_beta1: 0.9
 adam_beta2: 0.999
 adam_epsilon: 0.00000001
 resume_from_checkpoint: None
-
+report_to: "mlflow"
