@@ -24,11 +24,11 @@ import copy
 from detectron2.layers import FrozenBatchNorm2d
 import datasets
 from datasets import Image, Dataset
-from torchvision.transforms import ColorJitter
 import torch
 from torch import nn
 from transformers import Trainer,TrainerCallback, TrainingArguments,\
                          AutoFeatureExtractor, AutoModelForSemanticSegmentation
+from transformers.integrations import MLflowCallback
 import evaluate
 import numpy as np
 import os
@@ -37,6 +37,8 @@ from pathlib import Path
 import yaml
 import json
 import copy
+import mlflow
+
 
 # --------------------
 # - Class to handle the process parameters
@@ -46,14 +48,13 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
-        self.cfg["model_name"] = "Data2VecVision: facebook/data2vec-vision-base"
+        self.cfg["model_name"] = "Segformer: nvidia/mit-b0"
         self.cfg["epochs"] = 50
         self.cfg["batch_size"] = 4
         self.cfg["imgsz"] = 224
         self.cfg["learning_rate"] = 0.00006
         self.cfg["test_percentage"] = 0.2
         self.cfg["output_folder"] = None
-        self.cfg["ignore_idx_eval"] = 255
         self.cfg["expertModeCfg"] = None
         self.cfg["output_folder"] = None
 
@@ -67,7 +68,6 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["learning_rate"] = int(param_map["learning_rate"])
         self.cfg["test_percentage"] = float(param_map["test_percentage"])
         self.cfg["output_folder"] = str(param_map["output_folder"])
-        self.cfg["ignore_idx_eval"] = int(param_map["ignore_idx_eval"])
         self.cfg["expertModeCfg"] = param_map["expertModeCfg"]
         self.cfg["output_folder"] = param_map["output_folder"]
 
@@ -78,6 +78,60 @@ class StopTraining(TrainerCallback):
 
     def on_step_end(self, args, state, control, logs=None, **kwargs):
         control.should_training_stop = True
+
+
+class CustomMLflowCallback(TrainerCallback):
+    """
+    A [`TrainerCallback`] that sends the logs to [MLflow](https://www.mlflow.org/). Can be disabled by setting
+    environment variable `DISABLE_MLFLOW_INTEGRATION = TRUE`.
+    """
+    def __init__(self):
+        self._initialized = False
+        self._auto_end_run = False
+        self._log_artifacts = False
+        self._ml_flow = mlflow
+
+    def setup(self, args, state, model):
+        self._initialized = True
+
+    def on_train_begin(self, args, state, control, model=None, **kwargs):
+        if not self._initialized:
+            self.setup(args, state, model)
+
+    def on_log(self, args, state, control, logs, model=None, **kwargs):
+        if not self._initialized:
+            self.setup(args, state, model)
+        if state.is_world_process_zero:
+            metrics = {}
+            for k, v in logs.items():
+                if isinstance(v, (int, float)):
+                    metrics[k] = v
+            self._ml_flow.log_metrics(metrics=metrics, step=state.global_step)
+
+    def on_train_end(self, args, state, control, **kwargs):
+        if self._initialized and state.is_world_process_zero:
+            if self._auto_end_run and self._ml_flow.active_run():
+                self._ml_flow.end_run()
+
+    def on_save(self, args, state, control, **kwargs):
+        if self._initialized and state.is_world_process_zero and self._log_artifacts:
+            ckpt_dir = f"checkpoint-{state.global_step}"
+            artifact_path = os.path.join(args.output_dir, ckpt_dir)
+            self._ml_flow.pyfunc.log_model(
+                ckpt_dir,
+                artifacts={"model_path": artifact_path},
+                python_model=self._ml_flow.pyfunc.PythonModel(),
+            )
+
+    def __del__(self):
+        # if the previous run is not terminated correctly, the fluent API will
+        # not let you start a new run before the previous one is killed
+        if (
+            self._auto_end_run
+            and callable(getattr(self._ml_flow, "active_run", None))
+            and self._ml_flow.active_run() is not None
+        ):
+            self._ml_flow.end_run()
 
 # --------------------
 # - Class which implements the process
@@ -167,7 +221,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             else:
                 self.freeze_batchnorm2d(child)
 
-
     def run(self):
         # Core function of your process
         # Call beginTaskRun for initialization
@@ -231,9 +284,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.id2label = input.data["metadata"]['category_names']
         self.label2id = {v: k for k, v in self.id2label.items()}
 
-        # Index to be ignored during evaluation
-        self.ignore_idx_eval = param.cfg["ignore_idx_eval"]
-
         # Loading Model
         model = AutoModelForSemanticSegmentation.from_pretrained(
             self.model_id,
@@ -273,17 +323,15 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 load_best_model_at_end=True,
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
-                #dataloader_drop_last=True,
-                report_to = "mlflow",
+                report_to = None
             )
         else:
             with open(param.cfg["expertModeCfg"]) as f:
+                print("Loading training arguments from yaml file")
                 args = yaml.full_load(f)
-            training_args = TrainingArguments(
-                param.cfg["output_folder"],
-                learning_rate=param.cfg["learning_rate"],
-                **args,
-            )
+                training_args = TrainingArguments(
+                        param.cfg["output_folder"],
+                        **args)
 
         self.metric = evaluate.load("mean_iou")
 
@@ -294,7 +342,10 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             train_dataset=train_ds,
             eval_dataset=test_ds,
             compute_metrics=self.compute_metrics,
+            callbacks = [CustomMLflowCallback]
         )
+
+        self.trainer.remove_callback(MLflowCallback)
         self.trainer.train()
 
         # Step progress bar:
