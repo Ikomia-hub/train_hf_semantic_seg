@@ -78,12 +78,6 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
                                                                 min = 0.01, max = 1.0,
                                                                 step = 0.05, decimals = 2)
 
-        # Ingore index
-        self.ignore_idx_eval = pyqtutils.append_double_spin(self.grid_Layout, 
-                                                            "Index number ignored during eval",
-                                                            self.parameters.cfg["ignore_idx_eval"],
-                                                            min = 0, max = 255, step = 1, decimals = 0)
-
         # Expert mode configuration
         self.browse_config = pyqtutils.append_browse_file(self.grid_Layout, label="Advanced YAML config",
                                                         path=self.parameters.cfg["expertModeCfg"],
@@ -111,7 +105,6 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg["learning_rate"] = self.spin_lr.value()
         self.parameters.cfg["test_percentage"] = self.spin_train_test_split.value()
         self.parameters.cfg["imgsz"] = self.spin_train_imgsz.value()
-        self.parameters.cfg["ignore_idx_eval"] = self.ignore_idx_eval.value()
         self.parameters.cfg["expertModeCfg"] = self.browse_config.path
         self.parameters.cfg["output_folder"] = self.browse_folder.path
         self.emitApply(self.parameters)
