@@ -358,6 +358,10 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         super().stop()
         print("Stopping requested...")
         self.trainer.add_callback(StopTraining)
+        print("Saving model...")
+        self.trainer.save_model()
+        self.trainer.save_state()
+        print("Model saved.")
 
 
 # - Factory class to build process object
