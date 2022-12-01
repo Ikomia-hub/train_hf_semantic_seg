@@ -49,6 +49,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
     def __init__(self):
         TaskParam.__init__(self)
         self.cfg["model_name"] = "Segformer: nvidia/mit-b0"
+        self.cfg["model_card"] = "nvidia/segformer-b0-finetuned-ade-512-512"
         self.cfg["epochs"] = 50
         self.cfg["batch_size"] = 4
         self.cfg["imgsz"] = 224
@@ -62,6 +63,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         # Set parameters values from Ikomia application
         # Parameters values are stored as string and accessible like a python dict
         self.cfg["model_name"] = str(param_map["model_name"])
+        self.cfg["model_card"] = str(param_map["model_card"])
         self.cfg["epochs"] = int(param_map["epochs"])
         self.cfg["batch_size"] = int(param_map["batch_size"])
         self.cfg["imgsz"] = int(param_map["imgsz"])
@@ -232,8 +234,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         param = self.getParam()
 
-        self.beginTaskRun()
-
         # Dataset preparation and train/test split
         filename_list = []
         for image in input.data["images"]:
@@ -255,8 +255,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
-        # Model name
-        self.model_id = param.cfg["model_name"].split(": ",1)[1]
+        # Model name selection
+        if param.cfg["model_name"] == "From: Costum model name":
+            self.model_id = param.cfg["model_card"]
+        else:
+            self.model_id = param.cfg["model_name"].split(": ",1)[1]
+            param.cfg["model_card"] = None
 
         # Checking if the selected image size fits the model
         with open(self.imgsz_file, "r") as f:
@@ -286,11 +290,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Loading Model
         model = AutoModelForSemanticSegmentation.from_pretrained(
-            self.model_id,
-            num_labels = self.num_labels,
-            id2label = self.id2label,
-            label2id = self.label2id,
-            ignore_mismatched_sizes=True)
+                                                            self.model_id,
+                                                            num_labels = self.num_labels,
+                                                            id2label = self.id2label,
+                                                            label2id = self.label2id,
+                                                            ignore_mismatched_sizes=True
+                                                            )
 
         # Tensorboard directory
         str_datetime = datetime.now().strftime("%d-%m-%YT%Hh%Mm%Ss")
@@ -344,8 +349,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             compute_metrics=self.compute_metrics,
             callbacks = [CustomMLflowCallback]
         )
-
+        # Remove default mlflow callback
         self.trainer.remove_callback(MLflowCallback)
+
+        self.beginTaskRun()
+
+        # Start training loop
         self.trainer.train()
 
         # Step progress bar:

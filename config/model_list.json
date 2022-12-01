@@ -1,4 +1,5 @@
 {
+  "Costum model name": "From",
   "microsoft/beit-base-patch16-224-pt22k-ft22k":"BEiT",
   "microsoft/beit-base-patch16-224-pt22k":"BEiT",
   "microsoft/beit-base-patch16-224":"BEiT", 

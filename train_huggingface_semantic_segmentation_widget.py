@@ -54,6 +54,13 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
 
         self.combo_model.setCurrentText(self.parameters.cfg["model_name"])
 
+        # Load manually selected model card
+        self.load_model_card = pyqtutils.append_edit(
+                                                self.grid_Layout,
+                                                "Costum model name",
+                                                self.parameters.cfg["model_card"]
+                                                )
+
         # Epochs
         self.spin_epochs = pyqtutils.append_spin(self.grid_Layout, "Epochs",
                                                 self.parameters.cfg["epochs"])
@@ -89,17 +96,24 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
                                                         tooltip="Select output folder",
                                                         mode=QFileDialog.Directory)
 
+        self.combo_model.currentTextChanged.connect(self.on_combo_task_changed)
+        self.load_model_card.setVisible(self.combo_model.currentText() == "From: Costum model name")
+
         # PyQt -> Qt wrapping
         layout_ptr = qtconversion.PyQtToQt(self.grid_Layout)
 
         # Set widget layout
         self.setLayout(layout_ptr)
 
+    def on_combo_task_changed(self):
+            self.load_model_card.setVisible(self.combo_model.currentText() == "From: Costum model name")
+
     def onApply(self):
         # Apply button clicked slot
         # Get parameters from widget
         # Send signal to launch the process
         self.parameters.cfg["model_name"] = self.combo_model.currentText()
+        self.parameters.cfg["model_card"] = self.load_model_card.text()
         self.parameters.cfg["epochs"] = self.spin_epochs.value()
         self.parameters.cfg["batch_size"] = self.spin_batch.value()
         self.parameters.cfg["learning_rate"] = self.spin_lr.value()
