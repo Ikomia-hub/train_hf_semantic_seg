@@ -84,8 +84,9 @@ class StopTraining(TrainerCallback):
 
 class CustomMLflowCallback(TrainerCallback):
     """
-    A [`TrainerCallback`] that sends the logs to [MLflow](https://www.mlflow.org/). Can be disabled by setting
-    environment variable `DISABLE_MLFLOW_INTEGRATION = TRUE`.
+    A [`TrainerCallback`] that sends the logs to [MLflow](https://www.mlflow.org/). 
+    Can be disabled by setting environment variable 
+    `DISABLE_MLFLOW_INTEGRATION = TRUE`.
     """
     def __init__(self):
         self._initialized = False
@@ -206,13 +207,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                         ignore_index=self.ignore_idx_eval,
                                         reduce_labels=False
                                         )
-
+            del metrics['per_category_iou']
+            del metrics['per_category_accuracy']
         # add per category metrics as individual key-value pairs
-        per_category_accuracy = metrics.pop("per_category_accuracy").tolist()
-        per_category_iou = metrics.pop("per_category_iou").tolist()
-
-        metrics.update({f"accuracy_{self.id2label[i]}": v for i, v in enumerate(per_category_accuracy)})
-        metrics.update({f"iou_{self.id2label[i]}": v for i, v in enumerate(per_category_iou)})
+        for key, value in metrics.items():
+            if type(value) is np.ndarray:
+                metrics[key] = value.tolist()
         return metrics
 
     def freeze_batchnorm2d(self, module: torch.nn.Module):
@@ -325,10 +325,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 eval_steps=20,
                 logging_steps=1,
                 eval_accumulation_steps=5,
-                load_best_model_at_end=True,
+                load_best_model_at_end=False,
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
-                report_to = None
+                report_to = None,
+                dataloader_drop_last=True,
+                prediction_loss_only =False,
             )
         else:
             with open(param.cfg["expertModeCfg"]) as f:
