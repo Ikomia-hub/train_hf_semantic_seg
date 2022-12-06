@@ -16,9 +16,6 @@ This plugin proposes to fine-tune semantic segmentation models using pre-trained
     - [facebook/data2vec-vision-base](https://huggingface.co/facebook/data2vec-vision-base)
 
 
-1. **[DPT](https://huggingface.co/docs/transformers/master/model_doc/dpt)** (from Intel Labs) released with the paper [Vision Transformers for Dense Prediction](https://arxiv.org/abs/2103.13413) by René Ranftl, Alexey Bochkovskiy, Vladlen Koltun.
-    - [Intel/dpt-large](https://huggingface.co/Intel/dpt-large)
-
 
 1. **[SegFormer](https://huggingface.co/docs/transformers/model_doc/segformer)** (from NVIDIA) released with the paper [SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers](https://arxiv.org/abs/2105.15203) by Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar, Jose M. Alvarez, Ping Luo.
     - [nvidia/mit-b0](https://huggingface.co/nvidia/mit-b0) 
