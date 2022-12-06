@@ -173,21 +173,13 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         else:
             return 1
 
-    def train_transforms(self, example_batch):
-        #param = self.getParam()
-        images = [x.convert("RGB") for x in example_batch['pixel_values']]
-        labels = [x for x in example_batch['label']]
-        inputs = self.feature_extractor(images, labels)
-        return inputs
-
-    def val_transforms(self, example_batch):
+    def transforms(self, example_batch):
         images = [x.convert("RGB") for x in example_batch['pixel_values']]
         labels = [x for x in example_batch['label']]
         inputs = self.feature_extractor(images, labels)
         return inputs
 
     def compute_metrics(self, eval_pred):
-        #metric = evaluate.load("mean_iou")
         with torch.no_grad():
             logits, labels = eval_pred
             logits_tensor = torch.from_numpy(logits)
@@ -280,8 +272,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                                                     resample=0,
                                                                     )
 
-        train_ds.set_transform(self.train_transforms)
-        test_ds.set_transform(self.val_transforms)
+        train_ds.set_transform(self.transforms)
+        test_ds.set_transform(self.transforms)
 
         # Labels preparation
         self.num_labels = len(input.data["metadata"]['category_names'])
@@ -321,14 +313,15 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 per_device_eval_batch_size=param.cfg["batch_size"],
                 evaluation_strategy="steps",
                 save_strategy="steps",
-                save_steps=20,
-                eval_steps=20,
+                save_steps=500,
+                save_total_limit=1,
+                eval_steps=500,
                 logging_steps=1,
                 eval_accumulation_steps=5,
                 load_best_model_at_end=False,
                 logging_dir=tb_dir,
                 remove_unused_columns=False,
-                report_to = None,
+                report_to=None,
                 dataloader_drop_last=True,
                 prediction_loss_only =False,
             )
