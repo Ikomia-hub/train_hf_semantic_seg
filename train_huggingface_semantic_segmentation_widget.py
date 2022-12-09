@@ -55,7 +55,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.combo_model.setCurrentText(self.parameters.cfg["model_name"])
 
         # Load manually selected model card
-        self.load_model_card = pyqtutils.append_edit(
+        self.load_model_card = pyqtutils.append_browse_file(
                                                 self.grid_Layout,
                                                 "Costum model name",
                                                 self.parameters.cfg["model_card"]
@@ -113,7 +113,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         # Get parameters from widget
         # Send signal to launch the process
         self.parameters.cfg["model_name"] = self.combo_model.currentText()
-        self.parameters.cfg["model_card"] = self.load_model_card.text()
+        self.parameters.cfg["model_card"] = self.load_model_card.path
         self.parameters.cfg["epochs"] = self.spin_epochs.value()
         self.parameters.cfg["batch_size"] = self.spin_batch.value()
         self.parameters.cfg["learning_rate"] = self.spin_lr.value()

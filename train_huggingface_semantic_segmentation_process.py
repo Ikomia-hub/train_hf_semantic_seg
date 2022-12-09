@@ -55,6 +55,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["imgsz"] = 224
         self.cfg["learning_rate"] = 0.00006
         self.cfg["test_percentage"] = 0.2
+        self.cfg["expertModeCfg"] = ""
         self.cfg["output_folder"] = None
         self.cfg["expertModeCfg"] = None
         self.cfg["output_folder"] = None
@@ -339,12 +340,13 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.output_folder = param.cfg["output_folder"]
 
         # Checking batch size
-        if param.cfg["expertModeCfg"] is None and "nvidia" not in self.model_id:
-            if param.cfg["batch_size"] == 1:
-                self.freeze_batchnorm2d(model)
-        else:
-            if config["training_arg"]["per_device_train_batch_size"] == 1:
-                self.freeze_batchnorm2d(model)
+        if "nvidia" not in self.model_id:
+            if param.cfg["expertModeCfg"] is None: 
+                if param.cfg["batch_size"] == 1:
+                    self.freeze_batchnorm2d(model)
+            else:
+                if config["training_arg"]["per_device_train_batch_size"] == 1 :
+                    self.freeze_batchnorm2d(model)
 
         # Hyperparameters and costumization settings during training
         if param.cfg["expertModeCfg"] is None:
