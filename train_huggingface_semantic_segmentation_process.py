@@ -160,9 +160,13 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.ignore_idx_eval = 255
         self.metric = None
         self.model_id = None
+        self.training_args = None
+        self.output_folder = None
         self.enableTensorboard(True)
         self.imgsz_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "config", "model_img_size.json")
+        self.config_to_remove = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                                "config", "training_args_to_remove.yaml")
 
     def getProgressSteps(self):
         # Function returning the number of progress steps for this process
@@ -214,6 +218,34 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 setattr(module, name, FrozenBatchNorm2d(child.num_features))
             else:
                 self.freeze_batchnorm2d(child)
+    
+    def save_advanced_config(self, arg_dict):
+        # list training arguments to dict
+        arg_dict = arg_dict.to_sanitized_dict()
+
+        # load unused training arguments
+        with open(self.config_to_remove, 'r') as fp:
+            unused_train_args = yaml.load(fp, Loader=yaml.FullLoader)
+        unused_train_args_list = []
+        for key, value in unused_train_args.items():
+            unused_train_args_list.append(key)
+
+        # remove unused args from training arguments
+        arg_dict = dict([(key, val) for key, val in arg_dict.items() if key not in unused_train_args_list])
+
+        # Add key to training arguments
+        arg_dict = {"training_arg" : arg_dict}
+
+        # Edit report to mlflow
+        arg_dict["training_arg"]["report_to"] = "mlflow"
+
+        # Add model id
+        arg_dict["_name_or_path"] = self.model_id
+
+        # Save training arguments
+        output_file = os.path.join(self.output_folder, "advanced_config.yaml")
+        with open(output_file, 'w') as outfile:
+            yaml.dump(arg_dict, outfile)
 
     def run(self):
         # Core function of your process
@@ -248,11 +280,16 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         test_ds = dataset["test"]
 
         # Model name selection
-        if param.cfg["model_name"] == "From: Costum model name":
-            self.model_id = param.cfg["model_card"]
+        if param.cfg["expertModeCfg"] is None:
+            if param.cfg["model_name"] == "From: Costum model name":
+                self.model_id = param.cfg["model_card"]
+            else:
+                self.model_id = param.cfg["model_name"].split(": ",1)[1]
+                param.cfg["model_card"] = None
         else:
-            self.model_id = param.cfg["model_name"].split(": ",1)[1]
-            param.cfg["model_card"] = None
+            with open(param.cfg["expertModeCfg"]) as f:
+                config = yaml.full_load(f)
+                self.model_id = config["_name_or_path"]
 
         # Checking if the selected image size fits the model
         with open(self.imgsz_file, "r") as f:
@@ -288,6 +325,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                                             label2id = self.label2id,
                                                             ignore_mismatched_sizes=True
                                                             )
+        model.train()
 
         # Tensorboard directory
         str_datetime = datetime.now().strftime("%d-%m-%YT%Hh%Mm%Ss")
@@ -298,14 +336,19 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
             param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
                                          "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
+        self.output_folder = param.cfg["output_folder"]
 
         # Checking batch size
-        if "nvidia" not in self.model_id and param.cfg["batch_size"] == 1:
-            self.freeze_batchnorm2d(model)
+        if param.cfg["expertModeCfg"] is None and "nvidia" not in self.model_id:
+            if param.cfg["batch_size"] == 1:
+                self.freeze_batchnorm2d(model)
+        else:
+            if config["training_arg"]["per_device_train_batch_size"] == 1:
+                self.freeze_batchnorm2d(model)
 
         # Hyperparameters and costumization settings during training
         if param.cfg["expertModeCfg"] is None:
-            training_args = TrainingArguments(
+            self.training_args = TrainingArguments(
                 param.cfg["output_folder"],
                 learning_rate=param.cfg["learning_rate"],
                 num_train_epochs=param.cfg["epochs"],
@@ -326,19 +369,18 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 prediction_loss_only =False,
             )
         else:
-            with open(param.cfg["expertModeCfg"]) as f:
-                print("Loading training arguments from yaml file")
-                args = yaml.full_load(f)
-                training_args = TrainingArguments(
-                        param.cfg["output_folder"],
-                        **args)
+            print("Loading training arguments from yaml file")
+            args = config["training_arg"]
+            self.training_args = TrainingArguments(
+                    param.cfg["output_folder"],
+                    **args)
 
         self.metric = evaluate.load("mean_iou")
 
         # Instantiation of the Trainer API for training with Pytorch
         self.trainer = Trainer(
             model=model,
-            args=training_args,
+            args=self.training_args,
             train_dataset=train_ds,
             eval_dataset=test_ds,
             compute_metrics=self.compute_metrics,
@@ -351,6 +393,9 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Start training loop
         self.trainer.train()
+
+        # Save advanced config
+        self.save_advanced_config(self.training_args)
 
         # Step progress bar:
         self.emitStepProgress()
@@ -365,6 +410,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         print("Saving model...")
         self.trainer.save_model()
         self.trainer.save_state()
+        self.save_advanced_config(self.training_args)
+        print("advanced_config.yaml saved")
         print("Model saved.")
 
 
