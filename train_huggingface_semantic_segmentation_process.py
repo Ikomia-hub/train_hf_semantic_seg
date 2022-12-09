@@ -281,6 +281,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         test_ds = dataset["test"]
 
         # Model name selection
+        if param.cfg["expertModeCfg"] == "":
+            param.cfg["expertModeCfg"] = None
         if param.cfg["expertModeCfg"] is None:
             if param.cfg["model_name"] == "From: Costum model name":
                 self.model_id = param.cfg["model_card"]
@@ -333,6 +335,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         tb_dir = str((Path(core.config.main_cfg["tensorboard"]["log_uri"]) / str_datetime))
 
         # Setting up output directory
+        if param.cfg["output_folder"] == "":
+            param.cfg["output_folder"] = None
         if param.cfg["output_folder"] is None:
             param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
                                          "outputs", self.model_id, str_datetime)
