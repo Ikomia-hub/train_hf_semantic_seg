@@ -360,11 +360,11 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 num_train_epochs=param.cfg["epochs"],
                 per_device_train_batch_size=param.cfg["batch_size"],
                 per_device_eval_batch_size=param.cfg["batch_size"],
-                evaluation_strategy="steps",
-                save_strategy="steps",
-                save_steps=500,
+                evaluation_strategy="epoch",
+                save_strategy="epoch",
+                save_steps=1,
                 save_total_limit=1,
-                eval_steps=500,
+                eval_steps=1,
                 logging_steps=1,
                 eval_accumulation_steps=5,
                 load_best_model_at_end=False,
@@ -399,7 +399,8 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Start training loop
         self.trainer.train()
-
+        
+        self.trainer.save_model()
         # Save advanced config
         self.save_advanced_config(self.training_args)
 
