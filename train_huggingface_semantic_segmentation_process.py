@@ -25,6 +25,8 @@ from detectron2.layers import FrozenBatchNorm2d
 import datasets
 from datasets import Image, Dataset
 import torch
+import torch
+import torch.utils.data
 from torch import nn
 from transformers import Trainer,TrainerCallback, TrainingArguments,\
                          AutoFeatureExtractor, AutoModelForSemanticSegmentation
@@ -60,19 +62,19 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["expertModeCfg"] = None
         self.cfg["output_folder"] = None
 
-    def setParamMap(self, param_map):
+    def set_values(self, params):
         # Set parameters values from Ikomia application
         # Parameters values are stored as string and accessible like a python dict
-        self.cfg["model_name"] = str(param_map["model_name"])
-        self.cfg["model_card"] = str(param_map["model_card"])
-        self.cfg["epochs"] = int(param_map["epochs"])
-        self.cfg["batch_size"] = int(param_map["batch_size"])
-        self.cfg["imgsz"] = int(param_map["imgsz"])
-        self.cfg["learning_rate"] = int(param_map["learning_rate"])
-        self.cfg["test_percentage"] = float(param_map["test_percentage"])
-        self.cfg["output_folder"] = str(param_map["output_folder"])
-        self.cfg["expertModeCfg"] = param_map["expertModeCfg"]
-        self.cfg["output_folder"] = param_map["output_folder"]
+        self.cfg["model_name"] = str(params["model_name"])
+        self.cfg["model_card"] = str(params["model_card"])
+        self.cfg["epochs"] = int(params["epochs"])
+        self.cfg["batch_size"] = int(params["batch_size"])
+        self.cfg["imgsz"] = int(params["imgsz"])
+        self.cfg["learning_rate"] = int(params["learning_rate"])
+        self.cfg["test_percentage"] = float(params["test_percentage"])
+        self.cfg["output_folder"] = str(params["output_folder"])
+        self.cfg["expertModeCfg"] = params["expertModeCfg"]
+        self.cfg["output_folder"] = params["output_folder"]
 
 # --------------------
 # - Class to handle stopping the train process on request
@@ -89,11 +91,13 @@ class CustomMLflowCallback(TrainerCallback):
     Can be disabled by setting environment variable 
     `DISABLE_MLFLOW_INTEGRATION = TRUE`.
     """
+    
     def __init__(self):
         self._initialized = False
         self._auto_end_run = False
         self._log_artifacts = False
         self._ml_flow = mlflow
+        
 
     def setup(self, args, state, model):
         self._initialized = True
@@ -149,9 +153,9 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Create parameters class
         if param is None:
-            self.setParam(TrainHuggingfaceSemanticSegmentationParam())
+            self.set_param_object(TrainHuggingfaceSemanticSegmentationParam())
         else:
-            self.setParam(copy.deepcopy(param))
+            self.set_param_object(copy.deepcopy(param))
 
         self.feature_extractor = None
         self.num_labels = None
@@ -162,17 +166,18 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.metric = None
         self.model_id = None
         self.training_args = None
-        self.output_folder = None
-        self.enableTensorboard(True)
+        self.output_folder = ""
+        self.enable_tensorboard(True)
+        self.enable_mlflow(False)
         self.imgsz_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "config", "model_img_size.json")
         self.config_to_remove = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "config", "training_args_to_remove.yaml")
 
-    def getProgressSteps(self):
+    def get_progress_steps(self):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
-        param = self.getParam()
+        param = self.get_param_object()
         if param is not None:
             return param.cfg["epochs"]
         else:
@@ -250,14 +255,14 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
     def run(self):
         # Core function of your process
-        # Call beginTaskRun for initialization
+        # Call begin_task_run for initialization
         # Mlflow setting
         os.environ["MLFLOW_FLATTEN_PARAMS"] = "TRUE"
 
         # Get input
-        input = self.getInput(0)
+        input = self.get_input(0)
 
-        param = self.getParam()
+        param = self.get_param_object()
 
         # Dataset preparation and train/test split
         filename_list = []
@@ -342,10 +347,10 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                                          "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
         self.output_folder = param.cfg["output_folder"]
-
+        
         # Checking batch size
         if "nvidia" not in self.model_id:
-            if param.cfg["expertModeCfg"] is None: 
+            if param.cfg["expertModeCfg"] is None:
                 if param.cfg["batch_size"] == 1:
                     self.freeze_batchnorm2d(model)
             else:
@@ -395,7 +400,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Remove default mlflow callback
         self.trainer.remove_callback(MLflowCallback)
 
-        self.beginTaskRun()
+        self.begin_task_run()
 
         # Start training loop
         self.trainer.train()
@@ -405,10 +410,10 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.save_advanced_config(self.training_args)
 
         # Step progress bar:
-        self.emitStepProgress()
+        self.emit_step_progress()
 
-        # Call endTaskRun
-        self.endTaskRun()
+        # Call end_task_run
+        self.end_task_run()
 
     def stop(self):
         super().stop()
@@ -431,15 +436,15 @@ class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
         dataprocess.CTaskFactory.__init__(self)
         # Set process information as string here
         self.info.name = "train_huggingface_semantic_segmentation"
-        self.info.shortDescription = "Train models for semantic segmentation"\
+        self.info.short_description = "Train models for semantic segmentation"\
                                      "with transformers from HuggingFace."
         self.info.description = "This model proposes train on semantic segmentation"\
                                 "using pre-trained models available on Hugging Face."
 
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Segmentation"
-        self.info.version = "1.0.0"
-        self.info.iconPath = "icons/icon.png"
+        self.info.version = "1.1.0"
+        self.info.icon_path = "icons/icon.png"
         self.info.authors = "Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond,"\
                             "Clement Delangue, Anthony Moi, Pierric Cistac, Tim Rault,"\
                             "Rémi Louf, Morgan Funtowicz, Joe Davison, Sam Shleifer,"\
@@ -450,7 +455,7 @@ class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
         self.info.journal = "EMNLP"
         self.info.license = "Apache License Version 2.0"
         # URL of documentation
-        self.info.documentationLink = "https://www.aclweb.org/anthology/2020.emnlp-demos.6"
+        self.info.documentation_link = "https://www.aclweb.org/anthology/2020.emnlp-demos.6"
         # Code source repository
         self.info.repository = "https://github.com/huggingface/transformers"
         # Keywords used for search

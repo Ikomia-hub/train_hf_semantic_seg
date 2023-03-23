@@ -103,12 +103,12 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         layout_ptr = qtconversion.PyQtToQt(self.grid_Layout)
 
         # Set widget layout
-        self.setLayout(layout_ptr)
+        self.set_layout(layout_ptr)
 
     def on_combo_task_changed(self):
             self.load_model_card.setVisible(self.combo_model.currentText() == "From: Costum model name")
 
-    def onApply(self):
+    def on_apply(self):
         # Apply button clicked slot
         # Get parameters from widget
         # Send signal to launch the process
@@ -121,7 +121,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg["imgsz"] = self.spin_train_imgsz.value()
         self.parameters.cfg["expertModeCfg"] = self.browse_config.path
         self.parameters.cfg["output_folder"] = self.browse_folder.path
-        self.emitApply(self.parameters)
+        self.emit_apply(self.parameters)
 
 
 # --------------------
