@@ -70,8 +70,8 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
                                                 self.parameters.cfg["batch_size"])
 
         # Input size
-        self.spin_train_imgsz = pyqtutils.append_spin(self.grid_Layout, "Image size",
-                                                    self.parameters.cfg["imgsz"])
+        self.spin_train_input_size = pyqtutils.append_spin(self.grid_Layout, "Image size",
+                                                    self.parameters.cfg["input_size"])
         # Learning rate
         self.spin_lr = pyqtutils.append_double_spin(self.grid_Layout, "Learning rate",
                                                     self.parameters.cfg["learning_rate"],
@@ -81,13 +81,13 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         # Train test split
         self.spin_train_test_split = pyqtutils.append_double_spin(self.grid_Layout,
                                                                 "Test image percentage",
-                                                                self.parameters.cfg["test_percentage"],
+                                                                self.parameters.cfg["dataset_split_ratio"],
                                                                 min = 0.01, max = 1.0,
                                                                 step = 0.05, decimals = 2)
 
         # Expert mode configuration
         self.browse_config = pyqtutils.append_browse_file(self.grid_Layout, label="Advanced YAML config",
-                                                        path=self.parameters.cfg["expertModeCfg"],
+                                                        path=self.parameters.cfg["config"],
                                                         tooltip="Select output folder")
 
         # Output folder
@@ -117,9 +117,9 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg["epochs"] = self.spin_epochs.value()
         self.parameters.cfg["batch_size"] = self.spin_batch.value()
         self.parameters.cfg["learning_rate"] = self.spin_lr.value()
-        self.parameters.cfg["test_percentage"] = self.spin_train_test_split.value()
-        self.parameters.cfg["imgsz"] = self.spin_train_imgsz.value()
-        self.parameters.cfg["expertModeCfg"] = self.browse_config.path
+        self.parameters.cfg["dataset_split_ratio"] = self.spin_train_test_split.value()
+        self.parameters.cfg["input_size"] = self.spin_train_input_size.value()
+        self.parameters.cfg["config"] = self.browse_config.path
         self.parameters.cfg["output_folder"] = self.browse_folder.path
         self.emit_apply(self.parameters)
 

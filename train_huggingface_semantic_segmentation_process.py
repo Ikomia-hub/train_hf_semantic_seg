@@ -21,10 +21,10 @@ from ikomia.core.task import TaskParam
 from ikomia.dnn import datasetio, dnntrain
 import copy
 # Your imports below
+from train_huggingface_semantic_segmentation import update_path
 from detectron2.layers import FrozenBatchNorm2d
 import datasets
 from datasets import Image, Dataset
-import torch
 import torch
 import torch.utils.data
 from torch import nn
@@ -50,30 +50,29 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
+        self.cfg["model_name_or_path"] = ""
         self.cfg["model_name"] = "Segformer: nvidia/mit-b0"
         self.cfg["model_card"] = "nvidia/segformer-b0-finetuned-ade-512-512"
         self.cfg["epochs"] = 50
         self.cfg["batch_size"] = 4
-        self.cfg["imgsz"] = 224
+        self.cfg["input_size"] = 224
         self.cfg["learning_rate"] = 0.00006
-        self.cfg["test_percentage"] = 0.2
-        self.cfg["expertModeCfg"] = ""
-        self.cfg["output_folder"] = None
-        self.cfg["expertModeCfg"] = None
+        self.cfg["dataset_split_ratio"] = 0.9
+        self.cfg["config"] = ""
         self.cfg["output_folder"] = None
 
     def set_values(self, params):
         # Set parameters values from Ikomia application
         # Parameters values are stored as string and accessible like a python dict
+        self.cfg["model_name_or_path"] = params["model_name_or_path"]
         self.cfg["model_name"] = str(params["model_name"])
         self.cfg["model_card"] = str(params["model_card"])
         self.cfg["epochs"] = int(params["epochs"])
         self.cfg["batch_size"] = int(params["batch_size"])
-        self.cfg["imgsz"] = int(params["imgsz"])
+        self.cfg["input_size"] = int(params["input_size"])
         self.cfg["learning_rate"] = int(params["learning_rate"])
-        self.cfg["test_percentage"] = float(params["test_percentage"])
-        self.cfg["output_folder"] = str(params["output_folder"])
-        self.cfg["expertModeCfg"] = params["expertModeCfg"]
+        self.cfg["dataset_split_ratio"] = float(params["dataset_split_ratio"])
+        self.cfg["config"] = params["config"]
         self.cfg["output_folder"] = params["output_folder"]
 
 # --------------------
@@ -166,10 +165,11 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.metric = None
         self.model_id = None
         self.training_args = None
+        self.model_name_or_path = ""
         self.output_folder = ""
         self.enable_tensorboard(True)
         self.enable_mlflow(False)
-        self.imgsz_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+        self.input_size_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "config", "model_img_size.json")
         self.config_to_remove = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                                                 "config", "training_args_to_remove.yaml")
@@ -280,33 +280,35 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Merging images and masks
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
-        dataset = dataset.train_test_split(param.cfg["test_percentage"]) # Train/test split
+        dataset = dataset.train_test_split(1 - param.cfg["dataset_split_ratio"]) # Train/test split
 
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
         # Model name selection
-        if param.cfg["expertModeCfg"] == "":
-            param.cfg["expertModeCfg"] = None
-        if param.cfg["expertModeCfg"] is None:
-            if param.cfg["model_name"] == "From: Costum model name":
-                self.model_id = param.cfg["model_card"]
+        if param.cfg["model_name_or_path"] == "":
+            if param.cfg["config"] == "":
+                param.cfg["config"] = None
+                if param.cfg["model_name"] == "From: Costum model name":
+                    self.model_id = param.cfg["model_card"]
+                else:
+                    self.model_id = param.cfg["model_name"].split(": ",1)[1]
+                    param.cfg["model_card"] = None
             else:
-                self.model_id = param.cfg["model_name"].split(": ",1)[1]
-                param.cfg["model_card"] = None
+                with open(param.cfg["config"]) as f:
+                    config = yaml.full_load(f)
+                    self.model_id = config["_name_or_path"]
         else:
-            with open(param.cfg["expertModeCfg"]) as f:
-                config = yaml.full_load(f)
-                self.model_id = config["_name_or_path"]
+            self.model_id = param.cfg["model_name_or_path"]
 
         # Checking if the selected image size fits the model
-        with open(self.imgsz_file, "r") as f:
+        with open(self.input_size_file, "r") as f:
             model_size_list = json.load(f)
         if self.model_id in model_size_list.keys():
             img_size = model_size_list[self.model_id]
             print(f'Image size parameter changed to ({img_size}x{img_size}) to match {self.model_id} model')
         else:
-            img_size = param.cfg["imgsz"]
+            img_size = param.cfg["input_size"]
 
         # Image transformation (tensor, data augmentation) on-the-fly batches
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
@@ -350,7 +352,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         
         # Checking batch size
         if "nvidia" not in self.model_id:
-            if param.cfg["expertModeCfg"] is None:
+            if param.cfg["config"] is None:
                 if param.cfg["batch_size"] == 1:
                     self.freeze_batchnorm2d(model)
             else:
@@ -358,7 +360,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                     self.freeze_batchnorm2d(model)
 
         # Hyperparameters and costumization settings during training
-        if param.cfg["expertModeCfg"] is None:
+        if param.cfg["config"] is None:
             self.training_args = TrainingArguments(
                 param.cfg["output_folder"],
                 learning_rate=param.cfg["learning_rate"],
