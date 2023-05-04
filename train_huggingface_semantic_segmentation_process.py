@@ -59,7 +59,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["learning_rate"] = 0.00006
         self.cfg["dataset_split_ratio"] = 0.9
         self.cfg["config"] = ""
-        self.cfg["output_folder"] = None
+        self.cfg["output_folder"] = ""
 
     def set_values(self, params):
         # Set parameters values from Ikomia application
@@ -70,7 +70,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["epochs"] = int(params["epochs"])
         self.cfg["batch_size"] = int(params["batch_size"])
         self.cfg["input_size"] = int(params["input_size"])
-        self.cfg["learning_rate"] = int(params["learning_rate"])
+        self.cfg["learning_rate"] = float(params["learning_rate"])
         self.cfg["dataset_split_ratio"] = float(params["dataset_split_ratio"])
         self.cfg["config"] = params["config"]
         self.cfg["output_folder"] = params["output_folder"]
@@ -90,13 +90,12 @@ class CustomMLflowCallback(TrainerCallback):
     Can be disabled by setting environment variable 
     `DISABLE_MLFLOW_INTEGRATION = TRUE`.
     """
-    
+
     def __init__(self):
         self._initialized = False
         self._auto_end_run = False
         self._log_artifacts = False
         self._ml_flow = mlflow
-        
 
     def setup(self, args, state, model):
         self._initialized = True
@@ -168,11 +167,13 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.model_name_or_path = ""
         self.output_folder = ""
         self.enable_tensorboard(True)
-        self.enable_mlflow(False)
+        self.enable_mlflow(True)
         self.input_size_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                                "config", "model_img_size.json")
+                                                                "config",
+                                                                "model_img_size.json")
         self.config_to_remove = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                                "config", "training_args_to_remove.yaml")
+                                                                "config",
+                                                                "training_args_to_remove.yaml")
 
     def get_progress_steps(self):
         # Function returning the number of progress steps for this process
@@ -224,8 +225,9 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 setattr(module, name, FrozenBatchNorm2d(child.num_features))
             else:
                 self.freeze_batchnorm2d(child)
-    
+
     def save_advanced_config(self, arg_dict):
+        param = self.get_param_object()
         # list training arguments to dict
         arg_dict = arg_dict.to_sanitized_dict()
 
@@ -249,7 +251,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         arg_dict["_name_or_path"] = self.model_id
 
         # Save training arguments
-        output_file = os.path.join(self.output_folder, "advanced_config.yaml")
+        output_file = os.path.join(param.cfg["output_folder"], "advanced_config.yaml")
         with open(output_file, 'w') as outfile:
             yaml.dump(arg_dict, outfile)
 
@@ -281,7 +283,6 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
         dataset = dataset.train_test_split(1 - param.cfg["dataset_split_ratio"]) # Train/test split
-
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
@@ -343,13 +344,10 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Setting up output directory
         if param.cfg["output_folder"] == "":
-            param.cfg["output_folder"] = None
-        if param.cfg["output_folder"] is None:
             param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
                                          "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
-        self.output_folder = param.cfg["output_folder"]
-        
+
         # Checking batch size
         if "nvidia" not in self.model_id:
             if param.cfg["config"] is None:
