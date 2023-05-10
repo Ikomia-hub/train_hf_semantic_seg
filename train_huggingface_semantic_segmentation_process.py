@@ -58,7 +58,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["input_size"] = 224
         self.cfg["learning_rate"] = 0.00006
         self.cfg["dataset_split_ratio"] = 0.9
-        self.cfg["config"] = ""
+        self.cfg["config_file"] = ""
         self.cfg["output_folder"] = ""
 
     def set_values(self, params):
@@ -72,7 +72,7 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["input_size"] = int(params["input_size"])
         self.cfg["learning_rate"] = float(params["learning_rate"])
         self.cfg["dataset_split_ratio"] = float(params["dataset_split_ratio"])
-        self.cfg["config"] = params["config"]
+        self.cfg["config_file"] = params["config_file"]
         self.cfg["output_folder"] = params["output_folder"]
 
 # --------------------
@@ -288,15 +288,15 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Model name selection
         if param.cfg["model_name_or_path"] == "":
-            if param.cfg["config"] == "":
-                param.cfg["config"] = None
+            if param.cfg["config_file"] == "":
+                param.cfg["config_file"] = None
                 if param.cfg["model_name"] == "From: Costum model name":
                     self.model_id = param.cfg["model_card"]
                 else:
                     self.model_id = param.cfg["model_name"].split(": ",1)[1]
                     param.cfg["model_card"] = None
             else:
-                with open(param.cfg["config"]) as f:
+                with open(param.cfg["config_file"]) as f:
                     config = yaml.full_load(f)
                     self.model_id = config["_name_or_path"]
         else:
@@ -350,7 +350,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Checking batch size
         if "nvidia" not in self.model_id:
-            if param.cfg["config"] is None:
+            if param.cfg["config_file"] is None:
                 if param.cfg["batch_size"] == 1:
                     self.freeze_batchnorm2d(model)
             else:
@@ -358,7 +358,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                     self.freeze_batchnorm2d(model)
 
         # Hyperparameters and costumization settings during training
-        if param.cfg["config"] is None:
+        if param.cfg["config_file"] is None:
             self.training_args = TrainingArguments(
                 param.cfg["output_folder"],
                 learning_rate=param.cfg["learning_rate"],

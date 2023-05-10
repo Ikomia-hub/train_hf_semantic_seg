@@ -87,7 +87,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
 
         # Expert mode configuration
         self.browse_config = pyqtutils.append_browse_file(self.grid_Layout, label="Advanced YAML config",
-                                                        path=self.parameters.cfg["config"],
+                                                        path=self.parameters.cfg["config_file"],
                                                         tooltip="Select output folder")
 
         # Output folder
@@ -119,7 +119,7 @@ class TrainHuggingfaceSemanticSegmentationWidget(core.CWorkflowTaskWidget):
         self.parameters.cfg["learning_rate"] = self.spin_lr.value()
         self.parameters.cfg["dataset_split_ratio"] = self.spin_train_test_split.value()
         self.parameters.cfg["input_size"] = self.spin_train_input_size.value()
-        self.parameters.cfg["config"] = self.browse_config.path
+        self.parameters.cfg["config_file"] = self.browse_config.path
         self.parameters.cfg["output_folder"] = self.browse_folder.path
         self.emit_apply(self.parameters)
 
