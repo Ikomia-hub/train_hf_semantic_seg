@@ -50,7 +50,6 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
-        self.cfg["model_name_or_path"] = ""
         self.cfg["model_name"] = "Segformer: nvidia/mit-b0"
         self.cfg["model_card"] = "nvidia/segformer-b0-finetuned-ade-512-512"
         self.cfg["epochs"] = 50
@@ -64,7 +63,6 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
     def set_values(self, params):
         # Set parameters values from Ikomia application
         # Parameters values are stored as string and accessible like a python dict
-        self.cfg["model_name_or_path"] = params["model_name_or_path"]
         self.cfg["model_name"] = str(params["model_name"])
         self.cfg["model_card"] = str(params["model_card"])
         self.cfg["epochs"] = int(params["epochs"])
@@ -286,21 +284,20 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
+
         # Model name selection
-        if param.cfg["model_name_or_path"] == "":
-            if param.cfg["config_file"] == "":
-                param.cfg["config_file"] = None
-                if param.cfg["model_name"] == "From: Costum model name":
-                    self.model_id = param.cfg["model_card"]
-                else:
-                    self.model_id = param.cfg["model_name"].split(": ",1)[1]
-                    param.cfg["model_card"] = None
+        if param.cfg["config_file"] == "":
+            param.cfg["config_file"] = None
+        if param.cfg["config_file"] is None:
+            if param.cfg["model_name"] == "From: Costum model name":
+                self.model_id = param.cfg["model_card"]
             else:
-                with open(param.cfg["config_file"]) as f:
-                    config = yaml.full_load(f)
-                    self.model_id = config["_name_or_path"]
+                self.model_id = param.cfg["model_name"].split(": ",1)[1]
+                param.cfg["model_card"] = None
         else:
-            self.model_id = param.cfg["model_name_or_path"]
+            with open(param.cfg["config_file"]) as f:
+                config = yaml.full_load(f)
+                self.model_id = config["_name_or_path"]
 
         # Checking if the selected image size fits the model
         with open(self.input_size_file, "r") as f:
