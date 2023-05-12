@@ -21,7 +21,7 @@ from ikomia.core.task import TaskParam
 from ikomia.dnn import datasetio, dnntrain
 import copy
 # Your imports below
-from train_huggingface_semantic_segmentation import update_path
+from train_hf_semantic_seg import update_path
 from detectron2.layers import FrozenBatchNorm2d
 import datasets
 from datasets import Image, Dataset
@@ -46,7 +46,7 @@ import mlflow
 # - Class to handle the process parameters
 # - Inherits PyCore.CWorkflowTaskParam from Ikomia API
 # --------------------
-class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
+class TrainHfSemanticSegParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
@@ -141,7 +141,7 @@ class CustomMLflowCallback(TrainerCallback):
 # - Class which implements the process
 # - Inherits PyCore.CWorkflowTask or derived from Ikomia API
 # --------------------
-class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
+class TrainHfSemanticSeg(dnntrain.TrainProcess):
 
     def __init__(self, name, param):
         dnntrain.TrainProcess.__init__(self, name, param)
@@ -149,7 +149,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Create parameters class
         if param is None:
-            self.set_param_object(TrainHuggingfaceSemanticSegmentationParam())
+            self.set_param_object(TrainHfSemanticSegParam())
         else:
             self.set_param_object(copy.deepcopy(param))
 
@@ -427,12 +427,12 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 # - Factory class to build process object
 # - Inherits PyDataProcess.CTaskFactory from Ikomia API
 # --------------------
-class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
+class TrainHfSemanticSegFactory(dataprocess.CTaskFactory):
 
     def __init__(self):
         dataprocess.CTaskFactory.__init__(self)
         # Set process information as string here
-        self.info.name = "train_huggingface_semantic_segmentation"
+        self.info.name = "train_hf_semantic_seg"
         self.info.short_description = "Train models for semantic segmentation"\
                                      "with transformers from HuggingFace."
         self.info.description = "This model proposes train on semantic segmentation"\
@@ -461,4 +461,4 @@ class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
 
     def create(self, param=None):
         # Create process object
-        return TrainHuggingfaceSemanticSegmentation(self.info.name, param)
+        return TrainHfSemanticSeg(self.info.name, param)
