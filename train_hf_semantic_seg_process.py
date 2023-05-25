@@ -21,10 +21,12 @@ from ikomia.core.task import TaskParam
 from ikomia.dnn import datasetio, dnntrain
 import copy
 # Your imports below
+from train_hf_semantic_seg import update_path
 from detectron2.layers import FrozenBatchNorm2d
 import datasets
 from datasets import Image, Dataset
 import torch
+import torch.utils.data
 from torch import nn
 from transformers import Trainer,TrainerCallback, TrainingArguments,\
                          AutoFeatureExtractor, AutoModelForSemanticSegmentation
@@ -44,7 +46,7 @@ import mlflow
 # - Class to handle the process parameters
 # - Inherits PyCore.CWorkflowTaskParam from Ikomia API
 # --------------------
-class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
+class TrainHfSemanticSegParam(TaskParam):
 
     def __init__(self):
         TaskParam.__init__(self)
@@ -52,27 +54,24 @@ class TrainHuggingfaceSemanticSegmentationParam(TaskParam):
         self.cfg["model_card"] = "nvidia/segformer-b0-finetuned-ade-512-512"
         self.cfg["epochs"] = 50
         self.cfg["batch_size"] = 4
-        self.cfg["imgsz"] = 224
+        self.cfg["input_size"] = 224
         self.cfg["learning_rate"] = 0.00006
-        self.cfg["test_percentage"] = 0.2
-        self.cfg["expertModeCfg"] = ""
-        self.cfg["output_folder"] = None
-        self.cfg["expertModeCfg"] = None
-        self.cfg["output_folder"] = None
+        self.cfg["dataset_split_ratio"] = 0.9
+        self.cfg["config_file"] = ""
+        self.cfg["output_folder"] = ""
 
-    def setParamMap(self, param_map):
+    def set_values(self, params):
         # Set parameters values from Ikomia application
         # Parameters values are stored as string and accessible like a python dict
-        self.cfg["model_name"] = str(param_map["model_name"])
-        self.cfg["model_card"] = str(param_map["model_card"])
-        self.cfg["epochs"] = int(param_map["epochs"])
-        self.cfg["batch_size"] = int(param_map["batch_size"])
-        self.cfg["imgsz"] = int(param_map["imgsz"])
-        self.cfg["learning_rate"] = int(param_map["learning_rate"])
-        self.cfg["test_percentage"] = float(param_map["test_percentage"])
-        self.cfg["output_folder"] = str(param_map["output_folder"])
-        self.cfg["expertModeCfg"] = param_map["expertModeCfg"]
-        self.cfg["output_folder"] = param_map["output_folder"]
+        self.cfg["model_name"] = str(params["model_name"])
+        self.cfg["model_card"] = str(params["model_card"])
+        self.cfg["epochs"] = int(params["epochs"])
+        self.cfg["batch_size"] = int(params["batch_size"])
+        self.cfg["input_size"] = int(params["input_size"])
+        self.cfg["learning_rate"] = float(params["learning_rate"])
+        self.cfg["dataset_split_ratio"] = float(params["dataset_split_ratio"])
+        self.cfg["config_file"] = params["config_file"]
+        self.cfg["output_folder"] = params["output_folder"]
 
 # --------------------
 # - Class to handle stopping the train process on request
@@ -89,6 +88,7 @@ class CustomMLflowCallback(TrainerCallback):
     Can be disabled by setting environment variable 
     `DISABLE_MLFLOW_INTEGRATION = TRUE`.
     """
+
     def __init__(self):
         self._initialized = False
         self._auto_end_run = False
@@ -141,7 +141,7 @@ class CustomMLflowCallback(TrainerCallback):
 # - Class which implements the process
 # - Inherits PyCore.CWorkflowTask or derived from Ikomia API
 # --------------------
-class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
+class TrainHfSemanticSeg(dnntrain.TrainProcess):
 
     def __init__(self, name, param):
         dnntrain.TrainProcess.__init__(self, name, param)
@@ -149,9 +149,9 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Create parameters class
         if param is None:
-            self.setParam(TrainHuggingfaceSemanticSegmentationParam())
+            self.set_param_object(TrainHfSemanticSegParam())
         else:
-            self.setParam(copy.deepcopy(param))
+            self.set_param_object(copy.deepcopy(param))
 
         self.feature_extractor = None
         self.num_labels = None
@@ -162,17 +162,21 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.metric = None
         self.model_id = None
         self.training_args = None
-        self.output_folder = None
-        self.enableTensorboard(True)
-        self.imgsz_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                                "config", "model_img_size.json")
+        self.model_name_or_path = ""
+        self.output_folder = ""
+        self.enable_tensorboard(True)
+        self.enable_mlflow(True)
+        self.input_size_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                                                "config",
+                                                                "model_img_size.json")
         self.config_to_remove = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                                                "config", "training_args_to_remove.yaml")
+                                                                "config",
+                                                                "training_args_to_remove.yaml")
 
-    def getProgressSteps(self):
+    def get_progress_steps(self):
         # Function returning the number of progress steps for this process
         # This is handled by the main progress bar of Ikomia application
-        param = self.getParam()
+        param = self.get_param_object()
         if param is not None:
             return param.cfg["epochs"]
         else:
@@ -219,8 +223,9 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                 setattr(module, name, FrozenBatchNorm2d(child.num_features))
             else:
                 self.freeze_batchnorm2d(child)
-    
+
     def save_advanced_config(self, arg_dict):
+        param = self.get_param_object()
         # list training arguments to dict
         arg_dict = arg_dict.to_sanitized_dict()
 
@@ -244,20 +249,20 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         arg_dict["_name_or_path"] = self.model_id
 
         # Save training arguments
-        output_file = os.path.join(self.output_folder, "advanced_config.yaml")
+        output_file = os.path.join(param.cfg["output_folder"], "advanced_config.yaml")
         with open(output_file, 'w') as outfile:
             yaml.dump(arg_dict, outfile)
 
     def run(self):
         # Core function of your process
-        # Call beginTaskRun for initialization
+        # Call begin_task_run for initialization
         # Mlflow setting
         os.environ["MLFLOW_FLATTEN_PARAMS"] = "TRUE"
 
         # Get input
-        input = self.getInput(0)
+        input = self.get_input(0)
 
-        param = self.getParam()
+        param = self.get_param_object()
 
         # Dataset preparation and train/test split
         filename_list = []
@@ -275,33 +280,33 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Merging images and masks
         dataset = datasets.concatenate_datasets([dataset_img, dataset_mask], axis=1)
         dataset = dataset.shuffle(seed=1)
-        dataset = dataset.train_test_split(param.cfg["test_percentage"]) # Train/test split
-
+        dataset = dataset.train_test_split(1 - param.cfg["dataset_split_ratio"]) # Train/test split
         train_ds = dataset["train"]
         test_ds = dataset["test"]
 
+
         # Model name selection
-        if param.cfg["expertModeCfg"] == "":
-            param.cfg["expertModeCfg"] = None
-        if param.cfg["expertModeCfg"] is None:
+        if param.cfg["config_file"] == "":
+            param.cfg["config_file"] = None
+        if param.cfg["config_file"] is None:
             if param.cfg["model_name"] == "From: Costum model name":
                 self.model_id = param.cfg["model_card"]
             else:
                 self.model_id = param.cfg["model_name"].split(": ",1)[1]
                 param.cfg["model_card"] = None
         else:
-            with open(param.cfg["expertModeCfg"]) as f:
+            with open(param.cfg["config_file"]) as f:
                 config = yaml.full_load(f)
                 self.model_id = config["_name_or_path"]
 
         # Checking if the selected image size fits the model
-        with open(self.imgsz_file, "r") as f:
+        with open(self.input_size_file, "r") as f:
             model_size_list = json.load(f)
         if self.model_id in model_size_list.keys():
             img_size = model_size_list[self.model_id]
             print(f'Image size parameter changed to ({img_size}x{img_size}) to match {self.model_id} model')
         else:
-            img_size = param.cfg["imgsz"]
+            img_size = param.cfg["input_size"]
 
         # Image transformation (tensor, data augmentation) on-the-fly batches
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
@@ -336,16 +341,13 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 
         # Setting up output directory
         if param.cfg["output_folder"] == "":
-            param.cfg["output_folder"] = None
-        if param.cfg["output_folder"] is None:
             param.cfg["output_folder"] = os.path.join(os.path.dirname(os.path.realpath(__file__)),\
                                          "outputs", self.model_id, str_datetime)
         os.makedirs(param.cfg["output_folder"], exist_ok=True)
-        self.output_folder = param.cfg["output_folder"]
 
         # Checking batch size
         if "nvidia" not in self.model_id:
-            if param.cfg["expertModeCfg"] is None: 
+            if param.cfg["config_file"] is None:
                 if param.cfg["batch_size"] == 1:
                     self.freeze_batchnorm2d(model)
             else:
@@ -353,7 +355,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
                     self.freeze_batchnorm2d(model)
 
         # Hyperparameters and costumization settings during training
-        if param.cfg["expertModeCfg"] is None:
+        if param.cfg["config_file"] is None:
             self.training_args = TrainingArguments(
                 param.cfg["output_folder"],
                 learning_rate=param.cfg["learning_rate"],
@@ -395,7 +397,7 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         # Remove default mlflow callback
         self.trainer.remove_callback(MLflowCallback)
 
-        self.beginTaskRun()
+        self.begin_task_run()
 
         # Start training loop
         self.trainer.train()
@@ -405,10 +407,10 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
         self.save_advanced_config(self.training_args)
 
         # Step progress bar:
-        self.emitStepProgress()
+        self.emit_step_progress()
 
-        # Call endTaskRun
-        self.endTaskRun()
+        # Call end_task_run
+        self.end_task_run()
 
     def stop(self):
         super().stop()
@@ -425,21 +427,21 @@ class TrainHuggingfaceSemanticSegmentation(dnntrain.TrainProcess):
 # - Factory class to build process object
 # - Inherits PyDataProcess.CTaskFactory from Ikomia API
 # --------------------
-class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
+class TrainHfSemanticSegFactory(dataprocess.CTaskFactory):
 
     def __init__(self):
         dataprocess.CTaskFactory.__init__(self)
         # Set process information as string here
-        self.info.name = "train_huggingface_semantic_segmentation"
-        self.info.shortDescription = "Train models for semantic segmentation"\
+        self.info.name = "train_hf_semantic_seg"
+        self.info.short_description = "Train models for semantic segmentation"\
                                      "with transformers from HuggingFace."
         self.info.description = "This model proposes train on semantic segmentation"\
                                 "using pre-trained models available on Hugging Face."
 
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Segmentation"
-        self.info.version = "1.0.0"
-        self.info.iconPath = "icons/icon.png"
+        self.info.version = "1.1.0"
+        self.info.icon_path = "icons/icon.png"
         self.info.authors = "Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond,"\
                             "Clement Delangue, Anthony Moi, Pierric Cistac, Tim Rault,"\
                             "Rémi Louf, Morgan Funtowicz, Joe Davison, Sam Shleifer,"\
@@ -450,7 +452,7 @@ class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
         self.info.journal = "EMNLP"
         self.info.license = "Apache License Version 2.0"
         # URL of documentation
-        self.info.documentationLink = "https://www.aclweb.org/anthology/2020.emnlp-demos.6"
+        self.info.documentation_link = "https://www.aclweb.org/anthology/2020.emnlp-demos.6"
         # Code source repository
         self.info.repository = "https://github.com/huggingface/transformers"
         # Keywords used for search
@@ -459,4 +461,4 @@ class TrainHuggingfaceSemanticSegmentationFactory(dataprocess.CTaskFactory):
 
     def create(self, param=None):
         # Create process object
-        return TrainHuggingfaceSemanticSegmentation(self.info.name, param)
+        return TrainHfSemanticSeg(self.info.name, param)

@@ -28,12 +28,12 @@ class IkomiaPlugin(dataprocess.CPluginProcessInterface):
     def __init__(self):
         dataprocess.CPluginProcessInterface.__init__(self)
 
-    def getProcessFactory(self):
+    def get_process_factory(self):
         # Instantiate process object
-        from train_huggingface_semantic_segmentation.train_huggingface_semantic_segmentation_process import TrainHuggingfaceSemanticSegmentationFactory
-        return TrainHuggingfaceSemanticSegmentationFactory()
+        from train_hf_semantic_seg.train_hf_semantic_seg_process import TrainHfSemanticSegFactory
+        return TrainHfSemanticSegFactory()
 
-    def getWidgetFactory(self):
+    def get_widget_factory(self):
         # Instantiate associated widget object
-        from train_huggingface_semantic_segmentation.train_huggingface_semantic_segmentation_widget import TrainHuggingfaceSemanticSegmentationWidgetFactory
-        return TrainHuggingfaceSemanticSegmentationWidgetFactory()
+        from train_hf_semantic_seg.train_hf_semantic_seg_widget import TrainHfSemanticSegWidgetFactory
+        return TrainHfSemanticSegWidgetFactory()
