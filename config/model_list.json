@@ -1,0 +1,22 @@
+{
+  "Costum model name": "From",
+  "microsoft/beit-base-patch16-224-pt22k-ft22k":"BEiT",
+  "microsoft/beit-base-patch16-224-pt22k":"BEiT",
+  "microsoft/beit-base-patch16-224":"BEiT", 
+  "microsoft/beit-base-patch16-384":"BEiT",
+  "microsoft/beit-large-patch16-224-pt22k-ft22k":"BEiT",
+  "microsoft/beit-large-patch16-224-pt22k":"BEiT",
+  "microsoft/beit-large-patch16-224":"BEiT",
+  "microsoft/beit-large-patch16-384":"BEiT", 
+  "microsoft/beit-large-patch16-512":"BEiT",
+  "facebook/data2vec-vision-base": "Data2VecVision",
+  "nvidia/mit-b0":"Segformer", 
+  "nvidia/mit-b1":"Segformer", 
+  "nvidia/mit-b2":"Segformer",
+  "nvidia/mit-b3":"Segformer",
+  "nvidia/mit-b4":"Segformer",
+  "nvidia/mit-b5":"Segformer"
+}
+
+
+
