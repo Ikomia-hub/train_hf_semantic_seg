@@ -1,1 +1,2 @@
 git+https://github.com/Ikomia-dev/detectron2.git@v0.6-win10
+pillow<=8.1.0
