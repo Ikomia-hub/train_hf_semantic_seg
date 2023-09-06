@@ -1,31 +1,117 @@
-# train_huggingface_semantic_segmentation
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Ikomia-hub/train_hf_semantic_seg/main/icons/icon.png" alt="Algorithm icon">
+  <h1 align="center">train_hf_semantic_seg</h1>
+</div>
+<br />
+<p align="center">
+    <a href="https://github.com/Ikomia-hub/train_hf_semantic_seg">
+        <img alt="Stars" src="https://img.shields.io/github/stars/Ikomia-hub/train_hf_semantic_seg">
+    </a>
+    <a href="https://app.ikomia.ai/hub/">
+        <img alt="Website" src="https://img.shields.io/website/http/app.ikomia.ai/en.svg?down_color=red&down_message=offline&up_message=online">
+    </a>
+    <a href="https://github.com/Ikomia-hub/train_hf_semantic_seg/blob/main/LICENSE.md">
+        <img alt="GitHub" src="https://img.shields.io/github/license/Ikomia-hub/train_hf_semantic_seg.svg?color=blue">
+    </a>    
+    <br>
+    <a href="https://discord.com/invite/82Tnw9UGGc">
+        <img alt="Discord community" src="https://img.shields.io/badge/Discord-white?style=social&logo=discord">
+    </a> 
+</p>
 
-This plugin proposes to fine-tune semantic segmentation models using pre-trained available on Hugging Face.
+This model proposes train on semantic segmentationusing pre-trained models available on Hugging Face.
 
-1. **[BEiT](https://huggingface.co/docs/transformers/model_doc/beit)** (from Microsoft) released with the paper [BEiT: BERT Pre-Training of Image Transformers](https://arxiv.org/abs/2106.08254) by Hangbo Bao, Li Dong, Furu Wei.
-    - [microsoft/beit-base-patch16-224-pt22k](https://huggingface.co/microsoft/beit-base-patch16-224-pt22k-ft22k)
-    - microsoft/beit-base-patch16-224
-    - microsoft/beit-base-patch16-384
-    - microsoft/beit-large-patch16-224-pt22k
-    - microsoft/beit-large-patch16-224
-    - microsoft/beit-large-patch16-384
-    - microsoft/beit-large-patch16-512
+[Insert illustrative image here. Image must be accessible publicly, in algorithm Github repository for example.
+<img src="images/illustration.png"  alt="Illustrative image" width="30%" height="30%">]
 
+## :rocket: Use with Ikomia API
 
-1. **[Data2Vec](https://huggingface.co/docs/transformers/model_doc/data2vec)** (from Facebook) released with the paper [Data2Vec:  A General Framework for Self-supervised Learning in Speech, Vision and Language](https://arxiv.org/abs/2202.03555) by Alexei Baevski, Wei-Ning Hsu, Qiantong Xu, Arun Babu, Jiatao Gu, Michael Auli.
-    - [facebook/data2vec-vision-base](https://huggingface.co/facebook/data2vec-vision-base)
+#### 1. Install Ikomia API
 
+We strongly recommend using a virtual environment. If you're not sure where to start, we offer a tutorial [here](https://www.ikomia.ai/blog/a-step-by-step-guide-to-creating-virtual-environments-in-python).
 
+```sh
+pip install ikomia
+```
 
-1. **[SegFormer](https://huggingface.co/docs/transformers/model_doc/segformer)** (from NVIDIA) released with the paper [SegFormer: Simple and Efficient Design for Semantic Segmentation with Transformers](https://arxiv.org/abs/2105.15203) by Enze Xie, Wenhai Wang, Zhiding Yu, Anima Anandkumar, Jose M. Alvarez, Ping Luo.
-    - [nvidia/mit-b0](https://huggingface.co/nvidia/mit-b0) 
-    - nvidia/mit-b1
-    - nvidia/mit-b2
-    - nvidia/mit-b3
-    - nvidia/mit-b4
-    - nvidia/mit-b5
+#### 2. Create your workflow
 
+[Change the sample image URL to fit algorithm purpose]
 
+```python
+import ikomia
+from ikomia.dataprocess.workflow import Workflow
 
-    
+# Init your workflow
+wf = Workflow()
 
+# Add algorithm
+algo = wf.add_task(name="train_hf_semantic_seg", auto_connect=True)
+
+# Run on your image  
+wf.run_on(url="example_image.png")
+```
+
+## :sunny: Use with Ikomia Studio
+
+Ikomia Studio offers a friendly UI with the same features as the API.
+
+- If you haven't started using Ikomia Studio yet, download and install it from [this page](https://www.ikomia.ai/studio).
+
+- For additional guidance on getting started with Ikomia Studio, check out [this blog post](https://www.ikomia.ai/blog/how-to-get-started-with-ikomia-studio).
+
+## :pencil: Set algorithm parameters
+
+[Explain each algorithm parameters]
+
+[Change the sample image URL to fit algorithm purpose]
+
+```python
+import ikomia
+from ikomia.dataprocess.workflow import Workflow
+
+# Init your workflow
+wf = Workflow()
+
+# Add algorithm
+algo = wf.add_task(name="train_hf_semantic_seg", auto_connect=True)
+
+algo.set_parameters({
+    "param1": "value1",
+    "param2": "value2",
+    ...
+})
+
+# Run on your image  
+wf.run_on(url="example_image.png")
+
+```
+
+## :mag: Explore algorithm outputs
+
+Every algorithm produces specific outputs, yet they can be explored them the same way using the Ikomia API. For a more in-depth understanding of managing algorithm outputs, please refer to the [documentation](https://ikomia-dev.github.io/python-api-documentation/advanced_guide/IO_management.html).
+
+```python
+import ikomia
+from ikomia.dataprocess.workflow import Workflow
+
+# Init your workflow
+wf = Workflow()
+
+# Add algorithm
+algo = wf.add_task(name="train_hf_semantic_seg", auto_connect=True)
+
+# Run on your image  
+wf.run_on(url="example_image.png")
+
+# Iterate over outputs
+for output in algo.get_outputs()
+    # Print information
+    print(output)
+    # Export it to JSON
+    output.to_json()
+```
+
+## :fast_forward: Advanced usage 
+
+[optional]
