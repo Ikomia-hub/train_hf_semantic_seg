@@ -434,10 +434,7 @@ class TrainHfSemanticSegFactory(dataprocess.CTaskFactory):
         # Set process information as string here
         self.info.name = "train_hf_semantic_seg"
         self.info.short_description = "Train models for semantic segmentation"\
-                                     "with transformers from HuggingFace."
-        self.info.description = "This model proposes train on semantic segmentation"\
-                                "using pre-trained models available on Hugging Face."
-
+                                      "with transformers from HuggingFace."
         # relative path -> as displayed in Ikomia application process tree
         self.info.path = "Plugins/Python/Segmentation"
         self.info.version = "1.1.0"
@@ -454,7 +451,8 @@ class TrainHfSemanticSegFactory(dataprocess.CTaskFactory):
         # URL of documentation
         self.info.documentation_link = "https://www.aclweb.org/anthology/2020.emnlp-demos.6"
         # Code source repository
-        self.info.repository = "https://github.com/huggingface/transformers"
+        self.info.repository = "https://github.com/Ikomia-hub/train_hf_semantic_seg"
+        self.info.original_repository = "https://github.com/huggingface/transformers"
         # Keywords used for search
         self.info.keywords = "semantic, segmentation, transformer, encoder MLP, decoder,"\
                             "Hugging Face, Pytorch, Segformer, DPT, Beit, data2vec"
