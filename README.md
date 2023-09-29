@@ -21,7 +21,7 @@
 
 Train on semantic segmentation models available on Hugging Face (Segformer, BeiT, Data2Vec-vision).
 
-![Segformer output](https://raw.githubusercontent.com/Ikomia-hub/train_hf_semantic_seg/feat/new_readme/icons/output.jpg)
+![Segformer output](https://raw.githubusercontent.com/Ikomia-hub/train_hf_semantic_seg/main/icons/output.jpg)
 
 
 ## :rocket: Use with Ikomia API
