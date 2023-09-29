@@ -456,6 +456,8 @@ class TrainHfSemanticSegFactory(dataprocess.CTaskFactory):
         # Keywords used for search
         self.info.keywords = "semantic, segmentation, transformer, encoder MLP, decoder,"\
                             "Hugging Face, Pytorch, Segformer, DPT, Beit, data2vec"
+        self.info.algo_type = core.AlgoType.TRAIN
+        self.info.algo_tasks = "SEMANTIC_SEGMENTATION"
 
     def create(self, param=None):
         # Create process object
